@@ -1,12 +1,18 @@
 #!/bin/bash
 
-declare -r APP_NAME=$(basename "$0")
-declare -r APP_VERSION="0.1.0"
-declare -r APP_DESCRIPTION="My custom app"
+# App details
+declare -r app_name=$(basename "$0")
+declare -r app_version="0.1.0"
+declare -r app_description="My custom app"
+
+# Global flags
+{
+  flagHelp=
+}
 
 function setup() {
-  add_flag "name string" "n" "assigns a name"; FLAG_NAME=$flag
-  add_flag "queue url" "Adds a url"; URL=$flag
+  add_flag "name string" "n" "assigns a name"
+  add_flag "queue url" "Adds a url"
 }
 
 function teardown() {
@@ -16,20 +22,17 @@ function teardown() {
 function version() {
   add_flag "short" "s" "short output"; short_output=$flag
 
-  if $FLAG_HELP; then
-    printf "Shows the version of ${APP_NAME}\n\n"
+  if $flagHelp; then
+    printf "Shows the version of ${app_name}\n\n"
     print_usage && exit 0;
   fi
 
   if ! $short_output; then
-    printf "%s { version %s } - %s\n" "$APP_NAME" "$APP_VERSION" "$APP_DESCRIPTION"
+    printf "%s { version %s } - %s\n" "$app_name" "$app_version" "$app_description"
   else
-    echo "$APP_VERSION"
+    echo "$app_version"
   fi
 }
-
-FLAG_HELP=
-FLAG_DEBUG=
 
 __setupFinished=false
 
@@ -37,8 +40,8 @@ __setupFinished=false
 # Main function #
 #################
 function main() {
-  add_cmd "version" "version" "Shows the version of ${APP_NAME}"
-  add_flag "help" "h" "Shows this help message or more information about a command"; FLAG_HELP=$flag
+  add_cmd "version" "version" "Shows the version of ${app_name}"
+  add_flag "help" "h" "Shows this help message or more information about a command"; flagHelp=$flag
   add_flag "debug" "Shows debug messages"; FLAG_DEBUG=$flag
   add_flag "g" "global mode"
   setup
@@ -66,7 +69,7 @@ Usage:
   %s [command] [flags]
 
 Available commands:
-" "$APP_DESCRIPTION" "$APP_NAME"
+" "$app_description" "$app_name"
 
     intend=$(__longest_key "${__commands[@]}")
 
