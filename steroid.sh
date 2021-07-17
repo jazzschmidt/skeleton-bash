@@ -11,10 +11,6 @@ declare -r app_description="My custom app"
 }
 
 function setup() {
-  add_flag "name string" "n" "assigns a name"
-  add_flag "queue url" "Adds a url"
-
-  # TODO:
   flag "q" "quiet" "silences all messages"; q=$flag
   flag "debug" "verbose output"
   flag "p" "printer friendly output"
@@ -23,9 +19,6 @@ function setup() {
   arg "b" "base" "base key for encryption" #        -b         base - base key for encryption
   arg "mad-hatter" "name" "name of the mad hatter" # --mad-hatter name - name of the mad hatter
   arg "g" "routine" "grant routine spec" #          -g routine      - grant routine spec
-
-  print_args
-  exit 0
 }
 
 function teardown() {
@@ -33,10 +26,10 @@ function teardown() {
 }
 
 function version() {
-  add_flag "short" "s" "short output"; short_output=$flag
+  flag "short" "s" "short output"; short_output=$flag
 
   if $flagHelp; then
-    printf "Shows the version of ${app_name}\n\n"
+    printf "Shows the version of %s\n\n" "${app_name}"
     print_usage && exit 0;
   fi
 
@@ -54,9 +47,8 @@ __setupFinished=false
 #################
 function main() {
   add_cmd "version" "version" "Shows the version of ${app_name}"
-  add_flag "help" "h" "Shows this help message or more information about a command"; flagHelp=$flag
-  add_flag "debug" "Shows debug messages"; FLAG_DEBUG=$flag
-  add_flag "g" "global mode"
+  flag "help" "h" "Shows this help message or more information about a command"; flagHelp=$flag
+  flag "debug" "Shows debug messages"; FLAG_DEBUG=$flag
   setup
 
   # Execute custom commands
@@ -83,60 +75,37 @@ function print_usage() {
 %s
 
 Usage:
-  %s [command] [flags]
+  %s [command] [flags]\n\n" "$app_description" "$app_name"
 
-Available commands:
-" "$app_description" "$app_name"
-
-    intend=$(__longest_key "${__commands[@]}")
-
-    for cmd in "${__commands[@]}" ; do
-        name=$(echo "$cmd" | cut -d":" -f1)
-        description=$(echo "$cmd" | cut -d":" -f2-)
-
-        printf "  %-${intend}s  %s\n" "$name" "$description"
-    done
-    echo
+    print_commands
   fi
 
-  printf "Flags:\n"
-  __print_flags "${__flags_func[@]}"
-
-  printf "\nGlobal flags:\n"
-  __print_flags "${__flags[@]}"
+  print_options
 }
 
-function __print_flags() {
-  local flags=("$@"); local flag; local flags_formatted=();
-  local name; local alias; local description; local intend;
-
-  for flag in "${flags[@]}" ; do
-      name=$(echo "--$flag" | cut -d":" -f1)
-      alias=$(echo "$flag" | cut -d":" -f2)
-      description=$(echo "$flag" | cut -d":" -f3-)
-
-      if [ -n "$alias" ]; then
-        name="-$alias, $name"
-      elif [ "${#name}" -eq 3 ]; then
-        name="${name:1}"
-      fi
-      flags_formatted+=("$name:$description")
-  done
-
-  intend=$(__longest_key "${flags_formatted[@]}")
-  for flag in "${flags_formatted[@]}" ; do
-    name=$(echo "$flag" | cut -d":" -f1)
-    description=$(echo "$flag" | cut -d":" -f2-)
-    printf "  %-${intend}s  %s\n" "$name" "$description"
-  done
-}
-
-__commands=()
-__commands_f=()
+__commands_list=()
 function add_cmd() {
   local name=$1; local func=$2; local description=$3
-  __commands+=("${name}:${description}")
-  __commands_f+=("${func}")
+  __commands_list+=("${name}#${func}#${description}")
+}
+
+function print_commands() {
+  local intend=0;
+  for cmd in "${__commands_list[@]}"; do
+      name=$(echo "$cmd" | cut -d'#' -f1)
+      if [ ${#name} -gt "$intend" ]; then intend=${#name}; fi;
+  done
+
+  echo "Available commands:"
+  out=""
+  for cmd in "${__commands_list[@]}"; do
+      name=$(echo "$cmd" | cut -d'#' -f1)
+      desc=$(echo "$cmd" | cut -d'#' -f3)
+      out+=$(printf "  %-${intend}s   %s" "$name" "$desc")
+      out+="\n"
+  done
+  echo -en "${out}" | sort -d
+  echo ""
 }
 
 {
@@ -242,7 +211,7 @@ function add_cmd() {
     return 1
   }
 
-  function print_args() {
+  function print_options() {
     local options_local=(); local options_global=();
     local desc_local=(); local desc_global=();
     local intend_local=0; local intend_global=0;
@@ -286,65 +255,29 @@ function add_cmd() {
       fi
     done
 
+    local_out=""; i=0
+    if [ "${#options_local}" -gt 0 ]; then
+      echo "Flags:"
+      for option in "${options_local[@]}"; do
+        local_out+=$(printf "  %-${intend_local}s   %s" "$option" "${desc_local[$i]}")
+        local_out+="\n"
+        (( i++ ))
+      done
+      echo -en "${local_out}" | sort -d
+      echo ""
+    fi
+
     global_out=""; i=0
-    for option in "${options_global[@]}"; do
-      global_out+=$(printf "  %-${intend_global}s   %s" "$option" "${desc_global[$i]}")
-      global_out+="\n"
-      (( i++ ))
-    done
-
-    echo -en "${global_out}" | sort -d
+    if [ "${#options_global}" -gt 0 ]; then
+      echo "Global flags:"
+      for option in "${options_global[@]}"; do
+        global_out+=$(printf "  %-${intend_global}s   %s" "$option" "${desc_global[$i]}")
+        global_out+="\n"
+        (( i++ ))
+      done
+      echo -en "${global_out}" | sort -d
+    fi
   }
-}
-
-__flags=() # Global flags
-__flags_func=() # Custom command flags
-flag=""
-function add_flag() {
-  local name="$1"; local alias; local description; local flagSpec;
-
-  if [ $# -eq 2 ]; then
-    description="$2"
-  else
-    alias="$2";description="$3"
-  fi
-
-  flagSpec="${name}:${alias}:${description}"
-
-  if $__setupFinished; then
-    __flags_func+=("$flagSpec")
-  else
-    __flags+=("$flagSpec")
-  fi
-
-  flag=false && get_flag "$name" "$alias"
-}
-
-function get_flag() {
-  local name; local value; local alias=$2; local match=false
-  name=$(echo "$1" | cut -d' ' -f1)
-  value=$(echo "$1 " | cut -d' ' -f2)
-
-  if [ "${#name}" -eq 1 ]; then
-    alias=$name; name="##"
-  fi
-
-  for arg in "${__args[@]}"; do
-    # Found value, quit loop
-    if $match; then
-      flag=$arg && return 0
-    fi
-
-    if [ "$arg" == "--$name" ] || [ "$arg" == "-$alias" ]; then
-      if [ -z "$value" ]; then
-        flag=true && return 0
-      else
-        match=true
-      fi
-    fi
-  done
-
-  return 1
 }
 
 
