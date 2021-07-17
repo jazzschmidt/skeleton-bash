@@ -1,22 +1,35 @@
 #!/bin/bash
 
+# shkeleton
+
 # App details
 app_name=$(basename "$0")
 app_version=${app_version:-"0.1.0"}
-app_description=${app_description:-"My custom app"}
+app_description=${app_description:-"My shkeleton app"}
 
 # Global flags
 {
   flagHelp=
 }
 
-function setup() {
-  :
+function _setup() {
+  : # Will be executed when script starts; before setup
 }
 
-function teardown() {
-  : # Will be executed when the script finishes
+function _teardown() {
+  : # Will be executed when the script finishes; after teardown
 }
+
+# Colors
+{
+  col_red="0;31"
+  col_green="0;32"
+  col_orange="0;33"
+  col_blue="0;34"
+  col_yellow="1;33"
+}
+
+
 
 function version() {
   flag "short" "s" "short output"; short_output=$flag
@@ -33,93 +46,104 @@ function version() {
   fi
 }
 
-#################
-# Main function #
-#################
-function main() {
-  cmd "version" "version" "shows the version of ${app_name}"
-  flag "h" "help" "shows this help message or more information about a command"; flagHelp=$flag
-  setup
 
-  # Execute custom commands
-  if is_custom_cmd "$1"; then
-    __setupFinished=true
-    exec_cmd "$1" "${@:2}"
-  elif [ "$1" == "--help" ]; then
-    print_usage
-  else
-    >&2 printf "%s: unknown command \"%s\"\n" "$app_name" "$1"
-    >&2 printf "Run '%s --help' for usage info.\n" "$app_name"
+{
+  # INTERNAL
+
+  __setupFinished=false
+  __args=( "$@" )
+  __commands_list=()
+  __flags_list=()
+  flag=false
+  __args_list=()
+  arg=""
+
+
+  # Shows error message on stderr
+  function error() {
+    printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | >&2 colorize $col_red
     exit 1
-  fi
-}
+  }
 
-function error() {
-    >&2 printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" && exit 1
-}
+  # Colorizes output via pipe
+  function colorize() {
+    local text; local color="$1";
 
-function print_usage() {
-  local intend; local name; local description; local cmd; local flag
+    [ -z "$color" ] && error "missing color argument"
 
-  if ! $__setupFinished; then
-    # Print main help
-    printf "\
+    IFS= read -re text
+    color_code='\033['"$color"'m'
+    no_color='\033[0m' # No Color
+    printf "${color_code}%s${no_color}\n" "$text"
+  }
+
+  # Prints usage information
+  function print_usage() {
+    local intend; local name; local description; local cmd; local flag
+
+    if ! $__setupFinished; then
+      # Print main help
+      printf "\
 %s
 
 Usage:
-  %s [command] [flags]\n\n" "$app_description" "$app_name"
+%s [command] [flags]\n\n" "$app_description" "$app_name"
 
-    print_commands
-  fi
+      print_commands
+    fi
 
-  print_options
-}
+    print_options
+  }
 
-__commands_list=()
-function cmd() {
-  local name=$1; local func=$2; local description=$3
-  __commands_list+=("${name}#${func}#${description}")
-}
 
-function is_custom_cmd() {
+
+
+
+
+  # Registers a custom command
+  function cmd() {
+    local name=$1; local func=$2; local description=$3
+    __commands_list+=("${name}#${func}#${description}")
+  }
+
+  # Checks if $1 is a custom command
+  function is_custom_cmd() {
     echo "${__commands_list[*]}" | cut -d'#' -f1 | grep "^$1" >/dev/null
-}
+  }
 
-function exec_cmd() {
-  local func
-  func=$(echo "${__commands_list[*]}" | cut -d'#' -f1-2 | grep "^$1#" | cut -d'#' -f2)
-  $func "${@:2}"
-}
+  # Executes the custom command $1
+  function exec_cmd() {
+    local func
+    func=$(echo "${__commands_list[*]}" | cut -d'#' -f1-2 | grep "^$1#" | cut -d'#' -f2)
+    $func "${@:2}"
+  }
 
-function print_commands() {
-  local intend=0;
-  for cmd in "${__commands_list[@]}"; do
-      name=$(echo "$cmd" | cut -d'#' -f1)
-      if [ ${#name} -gt "$intend" ]; then intend=${#name}; fi;
-  done
+  function print_commands() {
+    local intend=0;
+    for cmd in "${__commands_list[@]}"; do
+        name=$(echo "$cmd" | cut -d'#' -f1)
+        if [ ${#name} -gt "$intend" ]; then intend=${#name}; fi;
+    done
 
-  echo "Available commands:"
-  out=""
-  for cmd in "${__commands_list[@]}"; do
-      name=$(echo "$cmd" | cut -d'#' -f1)
-      desc=$(echo "$cmd" | cut -d'#' -f3)
-      out+=$(printf "  %-${intend}s   %s" "$name" "$desc")
-      out+="\n"
-  done
-  echo -en "${out}" | sort -d
-  echo ""
-}
+    echo "Available commands:"
+    out=""
+    for cmd in "${__commands_list[@]}"; do
+        name=$(echo "$cmd" | cut -d'#' -f1)
+        desc=$(echo "$cmd" | cut -d'#' -f3)
+        out+=$(printf "  %-${intend}s   %s" "$name" "$desc")
+        out+="\n"
+    done
+    echo -en "${out}" | sort -d
+    echo ""
+  }
 
-{
-  # Flags
 
-  flag=
-  __flags_list=()
 
-  # flag "q" "qiet" "silences all messages"
-  # flag "debug" "verbose output"
-  # flag "p" "printer friendly output"
-  # $short#$long#$description
+
+
+
+
+  # Registers a flag
   function flag() {
     local short; local long; local desc;
 
@@ -157,13 +181,15 @@ function print_commands() {
 
     return 1
   }
-}
 
-{
+
+
+
+
+
+
+
   # Args
-
-  arg=
-  __args_list=()
 
   # arg "n" "name" "text" "sets the name to <text>" # -n, --name text - sets the name to <text>
   # arg "b" "base" "base key for encryption" #        -b         base - base key for encryption
@@ -283,9 +309,51 @@ function print_commands() {
 }
 
 
-trap "teardown" ABRT EXIT QUIT INT TERM
 
-__setupFinished=false
 
-__args=( "$@" )
-main "${__args[@]}"
+if ! declare -F setup >/dev/null; then
+  error "no setup function defined"
+fi
+
+function __setup_cmd() {
+  _setup && setup
+}
+
+
+
+
+#################
+# Main function #
+#################
+function _main() {
+  cmd "version" "version" "shows the version of ${app_name}"
+  flag "h" "help" "shows this help message or more information about a command"; flagHelp=$flag
+
+  # Register teardown function
+  local teardown_cmd="_teardown"
+  if declare -F teardown >/dev/null; then
+    teardown_cmd="teardown; _teardown"
+  fi
+  trap "${teardown_cmd}" ABRT EXIT QUIT INT TERM
+
+  _setup && setup
+
+  local command="$1"
+  if [ -z "$command" ]; then
+    if declare -F main >/dev/null; then main "${@:2}"; else command="--help"; fi
+  fi
+
+  # Execute custom commands
+  if is_custom_cmd "$command"; then
+    __setupFinished=true
+    exec_cmd "$command" "${@:2}"
+  elif [ "$command" == "--help" ]; then
+    print_usage
+  else
+    >&2 printf "%s: unknown command \"%s\"\n" "$app_name" "$1"
+    >&2 printf "Run '%s --help' for usage info.\n" "$app_name"
+    exit 1
+  fi
+}
+
+_main "${__args[@]}"
