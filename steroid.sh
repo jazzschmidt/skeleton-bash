@@ -67,14 +67,30 @@ function version() {
 
   # Colorizes output via pipe
   function colorize() {
-    local text; local color="$1";
+    local color="$1"; local text="$2";
 
     [ -z "$color" ] && error "missing color argument"
+    [ -z "$text" ] && IFS= read -re text # Read from stdin
 
-    IFS= read -re text
     color_code='\033['"$color"'m'
     no_color='\033[0m' # No Color
     printf "${color_code}%s${no_color}\n" "$text"
+  }
+
+  function red() {
+    colorize $col_red "${@}"
+  }
+  function green() {
+    colorize $col_green "${@}"
+  }
+  function orange() {
+    colorize $col_orange "${@}"
+  }
+  function blue() {
+    colorize $col_blue "${@}"
+  }
+  function yellow() {
+    colorize $col_yellow "${@}"
   }
 
   # Prints usage information
