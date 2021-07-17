@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # App details
-declare -r app_name=$(basename "$0")
-declare -r app_version="0.1.0"
-declare -r app_description="My custom app"
+app_name=$(basename "$0")
+app_version=${app_version:-"0.1.0"}
+app_description=${app_description:-"My custom app"}
 
 # Global flags
 {
@@ -11,14 +11,7 @@ declare -r app_description="My custom app"
 }
 
 function setup() {
-  flag "q" "quiet" "silences all messages"; q=$flag
-  flag "debug" "verbose output"
-  flag "p" "printer friendly output"
-
-  arg "n" "name" "text" "sets the name to <text>" # -n, --name text - sets the name to <text>
-  arg "b" "base" "base key for encryption" #        -b         base - base key for encryption
-  arg "mad-hatter" "name" "name of the mad hatter" # --mad-hatter name - name of the mad hatter
-  arg "g" "routine" "grant routine spec" #          -g routine      - grant routine spec
+  :
 }
 
 function teardown() {
@@ -34,31 +27,30 @@ function version() {
   fi
 
   if ! $short_output; then
-    printf "%s { version %s } - %s\n" "$app_name" "$app_version" "$app_description"
+    printf "%s { version %s }\n" "$app_name" "$app_version"
   else
     echo "$app_version"
   fi
 }
 
-__setupFinished=false
-
 #################
 # Main function #
 #################
 function main() {
-  add_cmd "version" "version" "Shows the version of ${app_name}"
-  flag "help" "h" "Shows this help message or more information about a command"; flagHelp=$flag
-  flag "debug" "Shows debug messages"; FLAG_DEBUG=$flag
+  cmd "version" "version" "shows the version of ${app_name}"
+  flag "h" "help" "shows this help message or more information about a command"; flagHelp=$flag
   setup
 
   # Execute custom commands
   if is_custom_cmd "$1"; then
     __setupFinished=true
-    exec_cmd "$1" "${*:2}"
-  elif [ "$1" == "help" ]; then
+    exec_cmd "$1" "${@:2}"
+  elif [ "$1" == "--help" ]; then
     print_usage
   else
-    echo "Unknown"
+    >&2 printf "%s: unknown command \"%s\"\n" "$app_name" "$1"
+    >&2 printf "Run '%s --help' for usage info.\n" "$app_name"
+    exit 1
   fi
 }
 
@@ -84,9 +76,19 @@ Usage:
 }
 
 __commands_list=()
-function add_cmd() {
+function cmd() {
   local name=$1; local func=$2; local description=$3
   __commands_list+=("${name}#${func}#${description}")
+}
+
+function is_custom_cmd() {
+    echo "${__commands_list[*]}" | cut -d'#' -f1 | grep "^$1" >/dev/null
+}
+
+function exec_cmd() {
+  local func
+  func=$(echo "${__commands_list[*]}" | cut -d'#' -f1-2 | grep "^$1#" | cut -d'#' -f2)
+  $func "${@:2}"
 }
 
 function print_commands() {
@@ -281,45 +283,9 @@ function print_commands() {
 }
 
 
-function is_custom_cmd() {
-    local arg_name=$1; local cmd; local name
-    for cmd in "${__commands[@]}" ; do
-        name=$(echo "$cmd" | cut -d":" -f1)
-
-        if [ "${arg_name}" = "${name}" ]; then
-          return
-        fi
-    done
-
-    false
-}
-
-function exec_cmd() {
-    local arg_name=$1; local i; local name
-    for (( i = 0; i < ${#__commands[@]}; i++ )); do
-        name=$(echo "${__commands[$i]}" | cut -d":" -f1)
-
-        if [ "${arg_name}" = "${name}" ]; then
-          local func=${__commands_f[$i]}
-          $func "${@:2}"
-        fi
-    done
-}
-
-function __longest_key() {
-    local list=("$@"); local key; local length; local longest_key=0;
-    for entry in "${list[@]}" ; do
-        key=$(echo "$entry" | cut -d":" -f1)
-        length=${#key}
-        if [ "$length" -gt $longest_key ]; then
-          longest_key=$length
-        fi
-    done
-
-    echo "$longest_key"
-}
-
 trap "teardown" ABRT EXIT QUIT INT TERM
+
+__setupFinished=false
 
 __args=( "$@" )
 main "${__args[@]}"
