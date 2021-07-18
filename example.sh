@@ -12,7 +12,9 @@
 # To see the usage simply invoke it via '$ ./example.sh --help'.
 #
 # ATTENTION: In order to show usage/help for a command, we need to manually check for
-# the `--help` flag - have a look the `greet` function.
+# the `--help` flag. Also, the `print_usage` function must be called after the options
+# for that command are defined - have a look the `greet` function.
+#
 # Running '$ ./example.sh hello --help' will display something like:
 #
 #     Greets the user
@@ -23,6 +25,9 @@
 #     Global flags:
 #       -h, --help      shows this help message or more information about a command
 #       -v, --verbose   enable verbose output
+
+app_version="1.0.0"
+app_description="Example Shkeleton Script"
 
 . ./shkeleton.sh
 
