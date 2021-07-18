@@ -27,7 +27,7 @@
 #       -v, --verbose   enable verbose output
 
 app_version="1.0.0"
-app_description="Example Shkeleton Script"
+app_description="Example shkeleton Script"
 
 . ./shkeleton.sh
 

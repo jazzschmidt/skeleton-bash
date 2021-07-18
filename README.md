@@ -1,14 +1,14 @@
 <img src="assets/logo.png" />
 
-# SHKELETON - Bash Script Template
+# shkeleton - Bash Script Library
 
-Shkeleton is a library that provides a convenient way to structure and
+**shkeleton** is a library that provides a convenient way to structure and
 organize your bash scripts and assists you in writing versatile and easy-to-use programs.
 Whats most important: it generates usage information for you and your scripts users.
 
 ## Features
 
-Shkeleton makes it easy to 
+**shkeleton** makes it easy to 
 - [parse flag and argument options](#parsing-options)
 - generate extensive usage information
 - write scripts with different commands
@@ -24,7 +24,7 @@ Suppose this executable (chmod +x) `minimal-example.sh`:
 #!/bin/bash
 
 app_version="1.0.0"
-app_description="Example Shkeleton Script"
+app_description="Example shkeleton Script"
 
 source shkeleton.sh
 
@@ -61,7 +61,7 @@ function hello_world() {
 
 ## Parsing Options
 
-Defining options is pretty easy in Shkeleton:
+Defining options is pretty easy in **shkeleton**:
 ```bash
 flag "s" "silent" "silences output"
 local silent=$flag # true if either -s or --silent is present, false otherwise
@@ -101,7 +101,7 @@ There are a few special script workflow functions:
 |`main`|(Optional) Will be called instead of usage page when script is being called without command |
 
 Also, there are internal versions of these functions (`_setup`, `_teardown` and `_main`),
-that can be extended when using Shkeleton as a library and common logic applies to all
+that can be extended when using **shkeleton** as a library and common logic applies to all
 your programs.
 
 ### Helper Functions

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ========================================
-# ==   SHKELETON BASH SCRIPT TEMPLATE   ==
+# ==    BASH SCRIPT TEMPLATE   ==
 # ========================================
 #
 # This script can be used to conveniently create simple-to-use bash script.
