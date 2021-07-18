@@ -3,9 +3,9 @@
 # shkeleton
 
 # App details
-app_name=$(basename "$0")
-app_version=${app_version:-"0.1.0"}
-app_description=${app_description:-"My shkeleton app"}
+declare -r app_name=$(basename "$0")
+declare -r app_version=${app_version:-"0.1.0"}
+declare -r app_description=${app_description:-"My shkeleton app"}
 
 # Global flags
 {
