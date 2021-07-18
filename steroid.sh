@@ -20,15 +20,6 @@ function _teardown() {
   : # Will be executed when the script finishes; after teardown
 }
 
-# Colors
-{
-  col_red="0;31"
-  col_green="0;32"
-  col_orange="0;33"
-  col_blue="0;34"
-  col_yellow="1;33"
-}
-
 
 
 function version() {
@@ -57,6 +48,15 @@ function version() {
   flag=false
   __args_list=()
   arg=""
+
+  # Colors
+  {
+    col_red="0;31"
+    col_green="0;32"
+    col_orange="0;33"
+    col_blue="0;34"
+    col_yellow="1;33"
+  }
 
 
   # Shows error message on stderr
@@ -99,11 +99,13 @@ function version() {
 
     if ! $__setupFinished; then
       # Print main help
-      printf "\
-%s
+      cat <<-HELP
+${app_description}
 
 Usage:
-%s [command] [flags]\n\n" "$app_description" "$app_name"
+${app_name} [command] [flags]
+
+HELP
 
       print_commands
     fi
