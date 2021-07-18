@@ -2,17 +2,18 @@
 
 Shkeleton is a library that provides a convenient way to structure and
 organize your bash scripts and assists you in writing versatile and easy-to-use programs.
+Whats most important: it generates usage information for you and your scripts users.
 
 ## Features
 
 Shkeleton makes it easy to 
-- parse flag and argument options
+- [parse flag and argument options](#parsing-options)
 - generate extensive usage information
 - write scripts with different commands
 - setup and cleanup the environment
-- debug and trace your script
+- [debug and trace your script](#debugging-and-tracing)
 
-In addition to that, it offers functions to colorize output and emit error messages.  
+In addition to that, it offers functions to [colorize output and emit error messages](#helper-functions).  
 
 ## Minimal Example
 Suppose this executable (chmod +x) `minimal-example.sh`:
