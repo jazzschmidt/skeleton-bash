@@ -9,7 +9,7 @@ function teardown() {
 }
 
 function main() {
-  :
+  echo "args: $*"
 }
 
 . ./steroid.sh
