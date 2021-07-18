@@ -1,4 +1,4 @@
-[!logo](https://raw.github.com/jazzschmidt/shkeleton/main/assets/logo.svg?sanitize=true)
+[!logo](assets/logo.png)
 
 # SHKELETON - Bash Script Template
 
