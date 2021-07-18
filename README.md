@@ -126,3 +126,9 @@ are shown and colorized. They are formatted like:
 Since debugging of bash script can be pretty hard, you can also enable tracing by
 supplying the `TRACE` parameter just like the debug parameter, which will enable
 tracing as soon as the script enters your command.
+
+## TODO
+
+- parse concatenated flag arguments (`$ ./script -qts`)
+- validate unknown options
+- use associative arrays 
