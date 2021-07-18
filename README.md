@@ -1,3 +1,5 @@
+[!logo](assets/logo.svg)
+
 # SHKELETON - Bash Script Template
 
 Shkeleton is a library that provides a convenient way to structure and

@@ -1,0 +1,14 @@
+
+Hope you enjoy your new logo, here are the people that
+made your beautiful logo happen :)
+font name: Renner-MediumItalic
+font link: http://indestructibletype.com/BuyRenner.html
+font author: indestructible type*
+font author site: http://indestructibletype.com/Home.html
+
+
+icon designer: Enzo Martin
+icon designer link: /m_meuh
+        
+{"bg":"transparent","icon-gradient-0":"#30092A","icon-gradient-1":"#CB3C61","font":"#000000","slogan":"#141414"}
+      
