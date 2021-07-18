@@ -1,6 +1,39 @@
 #!/usr/bin/env bash
+# ========================================
+# ==   SHKELETON BASH SCRIPT TEMPLATE   ==
+# ========================================
+#
+# This script can be used to conveniently create simple-to-use bash script.
+# Either source this script or extend it to your needs and distribute it as a whole.
+#
+#
+# ======================
+# == USAGE AS LIBRARY ==
+# ======================
+# When used as a library, alas being sourced from your script, you need to define the
+# function `setup` in order to define options and provide startup code. Otherwise an
+# error will be raised.
+#
+# If a `teardown` function is defined, it will be called upon exiting the script.
+#
+# If a `main` function is defined, it will be executed with all options provided to
+# the script when invoking your script without a command. Without the main function, the
+# usage of your script will be displayed.
+#
+# You can define flag options via the `flag` function and argument options via `arg`.
+# Options added from your setup function will have global scope; options added from
+# command functions are bound to that command and will be displayed differently in the
+# usage.
+#
+# Commands can be added with `cmd`.
+#
+# -- EXAMPLE --
+# See 'example.sh' for a simple example.
+#
+# Thanks for using this library. Feel free to support me at https://github.com/jazzschmidt/shkeleton
+#
 
-# shkeleton
+
 
 
 # Global flags and variables
@@ -26,11 +59,12 @@ function _teardown() {
 }
 
 
-
+# Default command `version` shows an extended version information of your app
+# Option -s/--short emits the version number only
 function version() {
   flag "short" "s" "short output"; short_output=$flag
 
-  if $flagHelp; then
+  if $flag_help; then
     printf "Shows the version of %s\n\n" "${app_name}"
     print_usage && exit 0;
   fi
@@ -54,11 +88,22 @@ function version() {
 {
   # Internals
   {
-    __setupFinished=false
-    __args=( "$@" )
-    __commands_list=()
-    __flags_list=()
-    __args_list=()
+    declare -r __args=( "$@" )
+
+    declare __sourced=false
+    (return 0 2> /dev/null) && __sourced=true
+    readonly __sourced
+
+    declare __debug=false
+    declare __trace=false
+    (echo "${DEBUG-}" | grep -qi -E "^1|true|yes|y$") && __debug=true
+    (echo "${TRACE-}" | grep -qi -E "^1|true|yes|y$") && __trace=true
+    readonly __debug __trace
+
+    declare __setupFinished=false
+    declare __commands_list=()
+    declare __flags_list=()
+    declare __args_list=()
   }
 
   # Colors
@@ -71,39 +116,60 @@ function version() {
   }
 }
 
-# Shows error message on stderr
+# Shows an error message
 function error() {
-  printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | >&2 colorize $col_red
+  printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | >&2 red
   exit 1
 }
 
-# Colorizes output via pipe
-function colorize() {
-  local color="$1"; local text="$2";
+# Shows a debug message
+function debug() {
+  if $__debug; then
+    printf "[DEBUG] %s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | orange
+  fi
+}
 
-  [ -z "$color" ] && error "missing color argument"
-  [ -z "$text" ] && IFS= read -re text # Read from stdin
+
+# Colorizes output
+# ARGS:
+#   $1: color code (see $col_red etc.)
+#   $2: text to output (optional; otherwise text from stdin is read)
+function colorize() {
+  local color="${1-}"; local text="${2-}";
+
+  [ -z "${color}" ] && error "missing color argument"
+  [ -z "${text}" ] && IFS= read -re text # Read from stdin
 
   color_code='\033['"$color"'m'
   no_color='\033[0m' # No Color
   printf "${color_code}%s${no_color}\n" "$text"
 }
 
-function red() {
-  colorize $col_red "${@}"
+{
+  # Colorize functions can be called directly or via pipe:
+  # Example:
+  #   $ echo "Hello world" | green
+  #   $ red "an error occurred" >&2
+
+  function red() {
+    colorize $col_red "${@}"
+  }
+  function green() {
+    colorize $col_green "${@}"
+  }
+  function orange() {
+    colorize $col_orange "${@}"
+  }
+  function blue() {
+    colorize $col_blue "${@}"
+  }
+  function yellow() {
+    colorize $col_yellow "${@}"
+  }
 }
-function green() {
-  colorize $col_green "${@}"
-}
-function orange() {
-  colorize $col_orange "${@}"
-}
-function blue() {
-  colorize $col_blue "${@}"
-}
-function yellow() {
-  colorize $col_yellow "${@}"
-}
+
+
+
 
 # Prints usage information
 function print_usage() {
@@ -119,10 +185,10 @@ ${app_name} [command] [flags]
 
 HELP
 
-    print_commands
+    __print_commands
   fi
 
-  print_options
+  __print_options
 }
 
 
@@ -131,24 +197,41 @@ HELP
 
 
 # Registers a custom command
+# ARGS:
+#   $1: name of the command
+#   $2: function
+#   $3: command description
 function cmd() {
   local name=$1; local func=$2; local description=$3
   __commands_list+=("${name}#${func}#${description}")
 }
 
 # Checks if $1 is a custom command
-function is_custom_cmd() {
-  echo "${__commands_list[*]}" | cut -d'#' -f1 | grep "^$1" >/dev/null
+function __is_custom_cmd() {
+  local commands
+  printf -v commands "%s\n" "${__commands_list[@]}"
+  echo "${commands}" | cut -d'#' -f1 | grep "^$1" >/dev/null
 }
 
+
+
+
 # Executes the custom command $1
-function exec_cmd() {
-  local func
-  func=$(echo "${__commands_list[*]}" | cut -d'#' -f1-2 | grep "^$1#" | cut -d'#' -f2)
+function __exec_cmd() {
+  local func; local commands
+  printf -v commands "%s\n" "${__commands_list[@]}"
+  func=$(echo "${commands}" | cut -d'#' -f1-2 | grep "^$1#" | cut -d'#' -f2)
+
+  # Enable trace output if TRACE is set to true
+  if $__trace; then set -o xtrace; fi;
+
   $func "${@:2}"
 }
 
-function print_commands() {
+
+
+# Prints all commands, alphabetically sorted
+function __print_commands() {
   local intend=0; local out;
   local name; local desc;
 
@@ -175,13 +258,15 @@ function print_commands() {
 
 
 
-# Registers a flag
+# Registers a flag and sets $flag to either true or false
+# ARGS:
+#   $1: option (short or long)
+#   $2: description
+#   -- OR --
+#   $1-$2: option (short and long)
+#   $3: description
 function flag() {
   local short; local long; local desc; local scope;
-
-  if [ "$#" -ne 2 ] && [ "$#" -ne 3 ]; then
-    error "wrong number of arguments"
-  fi
 
   while [ $# -gt 1 ]; do
     local value="$1"
@@ -202,10 +287,11 @@ function flag() {
   flag=false && has_flag "$short" "$long" || true
 }
 
+# Checks whether a flag is present
 function has_flag() {
   local short="${1:-#}"; local long="${2:-#}";
 
-  for arg in "${__args[@]}"; do
+  for arg in "${__args[@]-}"; do
     if [ "$arg" == "-$short" ] || [ "$arg" == "--$long" ]; then
       flag=true && return 0
     fi
@@ -221,12 +307,15 @@ function has_flag() {
 
 
 
-# Args
-
-# arg "n" "name" "text" "sets the name to <text>" # -n, --name text - sets the name to <text>
-# arg "b" "base" "base key for encryption" #        -b         base - base key for encryption
-# arg "mad-hatter" "name" "name of the mad hatter" # --mad-hatter name - name of the mad hatter
-# arg "g" "routine" "grant routine spec" #          -g routine      - grant routine spec
+# Registers an argument and sets $arg to its value, if present.
+# ARGS:
+#   $1: option (short or long)
+#   $2: parameter name
+#   $3: description
+#   -- OR --
+#   $1-$2: option (short and long)
+#   $3: parameter name
+#   $4: description
 function arg() {
   local short; local long; local param; local desc;
 
@@ -255,6 +344,10 @@ function arg() {
   arg="" && get_arg "$short" "$long"
 }
 
+
+
+
+# Retrieves an argument and sets $arg to its value
 function get_arg() {
   local short="${1:-#}"; local long="${2:-#}"; local match=false;
 
@@ -271,7 +364,10 @@ function get_arg() {
   return 1
 }
 
-function print_options() {
+
+
+# Prints all options (flags/args), alphabetically sorted
+function __print_options() {
   local options_local=(); local options_global=();
   local desc_local=(); local desc_global=();
   local intend_local=0; local intend_global=0;
@@ -281,7 +377,7 @@ function print_options() {
 
   local is_args=true
   local arg;
-  for arg in "${__args_list[@]-}" "###" "${__flags_list[@]}"; do
+  for arg in "${__args_list[@]}" "###" "${__flags_list[@]}"; do
     if [ "$arg" = "###" ]; then
       is_args=false
       continue
@@ -301,7 +397,7 @@ function print_options() {
     # Remove dash (-)
     short="${short%-}"; long="${long%-}"
 
-    local line=
+    local line=""
 
     if [ -n "$short" ] && [ -n "$long" ]; then line="-$short, --$long"; fi;
     if [ -n "$short" ] && [ -z "$long" ]; then line="-$short"; fi;
@@ -320,26 +416,27 @@ function print_options() {
   done
 
   local local_out=""; local i=0
-  if [ "${#options_local}" -gt 0 ]; then
+  local option;
+
+  if [ "${#options_local[@]}" -gt 0 ]; then
     echo "Flags:"
     for option in "${options_local[@]}"; do
       local_out+=$(printf "  %-${intend_local}s   %s" "$option" "${desc_local[$i]}")
       local_out+="\n"
-      (( i++ ))
+      (( i+=1 ))
     done
     echo -en "${local_out}" | sort -d
     echo ""
   fi
 
   local global_out=""; i=0
-  local option;
 
-  if [ "${#options_global}" -gt 0 ]; then
+  if [ "${#options_global[@]}" -gt 0 ]; then
     echo "Global flags:"
     for option in "${options_global[@]}"; do
       global_out+=$(printf "  %-${intend_global}s   %s" "$option" "${desc_global[$i]}")
       global_out+="\n"
-      (( i++ ))
+      (( i+=1 ))
     done
     echo -en "${global_out}" | sort -d
   fi
@@ -351,12 +448,11 @@ function print_options() {
 
 
 
-#################
-# Main function #
-#################
+# MAIN FUNCTION
+# -------------
 function _main() {
   # set shopts when script is not sourced
-  if ! (return 0 2> /dev/null); then
+  if ! $__sourced; then
     set -o errexit
     set -o nounset
     set -o pipefail
@@ -366,7 +462,7 @@ function _main() {
   set -o errtrace
 
   # fail if no `setup` function is defined
-  if ! declare -F setup >/dev/null; then
+  if $__sourced && ! declare -F setup >/dev/null; then
     error "no setup function defined"
   fi
 
@@ -382,22 +478,30 @@ function _main() {
   trap "${teardown_cmd}" ABRT EXIT QUIT ERR
 
   # Local setup and internal setup
-  _setup && setup
+  _setup
+  $__sourced && setup
 
 
-  local command="$1"
+  local command="${1:-}"
   # Execute `main` function if defined and no command is set
-  if [ -z "$command" ] || [ "${command:0:1}" = "-" ] ; then
+  if [ -z "$command" ] || [ "${command:0:1}" = "-" ] && ! $flag_help ; then
     if declare -F main >/dev/null; then
+      if $__trace; then set -o xtrace; fi;
       main "${@:1}"
       exit $?
     fi
   fi
 
+  if [ -z "$command" ]; then
+    command="--help"
+  fi
+
+  debug "command: $command"
+
   # Execute custom commands
-  if is_custom_cmd "$command"; then
+  if __is_custom_cmd "$command"; then
     __setupFinished=true
-    exec_cmd "$command" "${@:2}"
+    __exec_cmd "$command" "${@:2}"
   elif [ "$command" == "--help" ]; then
     print_usage
   else
@@ -407,4 +511,12 @@ function _main() {
   fi
 }
 
-_main "${__args[@]}"
+# Execute _main if it was not explicitly called.
+# The trap is afterwards overwritten in the _main function
+function __init_trap() {
+  if [ $? -eq 0 ]; then
+    _main "${__args[@]}"
+  fi
+}
+
+trap __init_trap EXIT
