@@ -132,3 +132,4 @@ tracing as soon as the script enters your command.
 - parse concatenated flag arguments (`$ ./script -qts`)
 - validate unknown options
 - use associative arrays 
+- parse multiline input from stdin in `colorize`
