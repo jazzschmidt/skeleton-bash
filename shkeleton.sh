@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# ========================================
-# ==    BASH SCRIPT TEMPLATE   ==
-# ========================================
+# ╔═══════════════════════════════════════════════╗
+# ║    === shkeleton - Bash Script Library ===    ║
+# ╚═══════════════════════════════════════════════╝
 #
 # This script can be used to conveniently create simple-to-use bash script.
 # Either source this script or extend it to your needs and distribute it as a whole.
 #
 #
-# ======================
-# == USAGE AS LIBRARY ==
-# ======================
+# ╔═════════════════════╗
+# ║    --- Usage ---    ║
+# ╚═════════════════════╝
 # When used as a library, alas being sourced from your script, you need to define the
 # function `setup` in order to define options and provide startup code. Otherwise an
 # error will be raised.
