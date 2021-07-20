@@ -13,6 +13,7 @@
 
   # current handler properties
   declare __handler_description __handler_command __parent_handler
+  declare -a __handler_args=()
 
   # handlers
   declare -a __handlers
@@ -22,13 +23,14 @@
   declare -A __commands=()
   declare -A __commands_descriptions=()
 
-  declare __argv="$*" __command __opts
+  declare __argv="$*" __command
+  declare -a __opts
   {
     # set command by removing options
     __command="${__argv%% -*}"
     if [ "${__command:0:1}" = "-" ]; then __command=; fi
 
-    __opts="${__argv:${#__command}}"
+    read -a __opts <<< "${__argv:${#__command}}"
   }
 
 
@@ -46,11 +48,9 @@ command: $__command
 EOF
 
   handler="${__commands["$__command"]}"
-  $handler && execute
+  $handler && execute "${__handler_args[@]}"
   declare -p __flags
 }
-
-
 
 function description() {
   __handler_description="$*"
@@ -106,7 +106,7 @@ function get_arg() {
 
   arg=() # reset current value
 
-  for opt in $__opts; do
+  for opt in "${__opts[@]}"; do
     if $match; then
       arg+=("$opt")
       success=true
@@ -160,11 +160,11 @@ function has_flag() {
 
   flag=false
 
-  if [ -n "$long" ] && echo " ${__opts} " | grep -qe " --${long} "; then
+  if [ -n "$long" ] && echo " ${__opts[*]} " | grep -qe " --${long} "; then
     flag=true; return 0
   fi
 
-  if [ -n "$short" ] && echo " ${__opts}" | grep -qE " -[a-zA-Z0-9]*${short}"; then
+  if [ -n "$short" ] && echo " ${__opts[*]}" | grep -qE " -[a-zA-Z0-9]*${short}"; then
     flag=true; return 0
   fi
 
@@ -191,7 +191,7 @@ function @foo() {
     description "says goodbye"
 
     execute() {
-      echo "Goodbye!"
+      echo "Goodbye $1 - $2!"
     }
   }
 }
@@ -273,7 +273,7 @@ function parse_handler() {
 
 parse_handler
 
-currentArg=""
+declare currentArg=""
 
 function validate_short() {
   local option="$1" command="$2"
@@ -301,7 +301,9 @@ function validate_short() {
   echo "ERR ! Unknown option: $1" && exit 1
 }
 
-for opt in $__opts; do
+declare opt_nr=0
+
+for opt in "${__opts[@]}"; do
   if [ -n "$currentArg" ]; then
     if [ "${opt:0:1}" = "-" ]; then # value must not start with dash!
       echo "ERR ! value for $currentArg must not start with '-'" && exit 1
@@ -317,7 +319,14 @@ for opt in $__opts; do
     for (( i=1; i<${#opt}; i++ )); do
       validate_short "${opt:$i:1}" "$__command"
     done
+  elif echo " ${__opts[*]:$opt_nr+1}" | grep -qe " -"; then
+    echo "ERR ! Unrecognized option '${opt}'" && exit 1
+  else
+    read -a __handler_args <<< "${__opts[*]:$opt_nr}"
+    break
   fi
+
+  (( opt_nr+=1 ))
 done
 
 if [ -n "$currentArg" ]; then
