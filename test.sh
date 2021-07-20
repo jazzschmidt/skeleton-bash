@@ -5,6 +5,12 @@
   # ----------------
   declare flag # determines whether a flag is present
   declare -a arg # holds the values of an argument
+
+  declare app_name="${app_name:-$(basename "$0")}"
+  declare app_version="${app_version:-"0.1.0"}"
+  declare app_description="${app_description:-"My shkeleton.sh app"}"
+
+  declare flag_help=false
 }
 
 {
@@ -28,9 +34,12 @@
   {
     # set command by removing options
     __command="${__argv%% -*}"
-    if [ "${__command:0:1}" = "-" ]; then __command=; fi
-
-    read -a __opts <<< "${__argv:${#__command}}"
+    if [ "${__command:0:1}" = "-" ]; then
+      __command="_"
+      read -a __opts <<< "${__argv}"
+    else
+      read -a __opts <<< "${__argv:${#__command}}"
+    fi
   }
 
 
@@ -41,16 +50,133 @@
 
 
 function __main() {
-  cat <<EOF
-Main function started
+  local func; local -a args
 
-command: $__command
-EOF
+  if $flag_help; then
+    __help "$__command" && exit 0
+  fi
 
-  handler="${__commands["$__command"]}"
-  $handler && execute "${__handler_args[@]}"
-  declare -p __flags
+  if [ -z "$__command" ] || [ ! "${__commands[$__command]+abc}" ]; then
+    read -a args <<< "${__command}"
+    args+=("${__handler_args[@]}")
+
+    if >/dev/null declare -F main; then
+      # Execute main with all arguments provided
+      func=main
+      $func "${args[@]}"
+    else
+      [ -n "${args[*]}" ] && echo "ERR ! Unrecognized command: ${args[*]}"
+      # Run help task
+      __help && exit 1
+    fi
+  else
+    # Execute the handler function
+    handler="${__commands["$__command"]}"
+    $handler && execute "${__handler_args[@]}"
+  fi
 }
+
+function __help() {
+  local command="$1" description global_help=false usage
+
+  # Empty help function as default
+  function help() {
+    echo "${__commands_descriptions[$command]}"
+  }
+
+  [ -z "$command" ] || [ "$command" = "_" ] && global_help=true
+
+  if $global_help; then
+    usage="${app_name}"
+    description="${app_description}"
+  else
+    handler="${__commands["$command"]}" && $handler 1>&2 >/dev/null
+    usage="${app_name} ${command}"
+    description=$(help)
+  fi
+
+    cat <<-HELP
+${description}
+
+Usage:
+  ${usage} [command] [flags]
+
+HELP
+
+  if ! $global_help; then
+    __print_options "Flags" "${command}"
+    __print_options "Global flags"
+  else
+    __print_options "Flags"
+  fi
+}
+
+
+
+
+# Prints all options (flags/args), alphabetically sorted
+function __print_options() {
+  local heading="$1" command="${2:-_}"
+  local options=()
+  local descriptions=()
+  local intend=0
+
+  local param desc short long
+
+  local is_args=true
+  local arg;
+
+  local -a args=()
+  mapfile -t args < <(echo -e "${__args[$command]}\n###\n${__flags[$command]}")
+
+  for arg in "${args[@]}"; do
+    if [ "$arg" = "###" ]; then
+      is_args=false
+      continue
+    fi
+
+    short=$(echo "$arg" | cut -d'#' -f1)
+    long=$(echo "$arg" | cut -d'#' -f2)
+
+    if $is_args; then
+      param=$(echo "$arg" | cut -d'#' -f3)
+      desc=$(echo "$arg" | cut -d'#' -f4-)
+    else
+      desc=$(echo "$arg" | cut -d'#' -f3-)
+    fi
+
+    # Remove dash (-)
+    short="${short%-}"; long="${long%-}"
+
+    local line=""
+
+    if [ -n "$short" ] && [ -n "$long" ]; then line="-$short, --$long"; fi;
+    if [ -n "$short" ] && [ -z "$long" ]; then line="-$short"; fi;
+    if [ -z "$short" ] && [ -n "$long" ]; then line="--$long"; fi;
+    if $is_args; then line+=" ${param}"; fi;
+
+    options+=("$line")
+    descriptions+=("$desc")
+    if [ ${#line} -gt "$intend" ]; then intend=${#line}; fi;
+  done
+
+  local out=""; local i=0
+  local option;
+
+  if [ "${#options[@]}" -gt 0 ]; then
+    echo "${heading}"
+    for option in "${options[@]}"; do
+      out+=$(printf "  %-${intend}s   %s" "$option" "${descriptions[$i]}")
+      out+="\n"
+      (( i+=1 ))
+    done
+    echo -en "${out}" | sort -d
+    echo ""
+  fi
+}
+
+
+
 
 function description() {
   __handler_description="$*"
@@ -72,7 +198,7 @@ function command() {
 #   $4: description
 function arg() {
   local short long param desc i value;
-  local registered_args="${__args["${__handler_command}"]}"
+  local registered_args="${__args["${__handler_command:-_}"]}"
   local args=( "$@" )
 
   for i in $(seq "$#" 1); do
@@ -132,7 +258,7 @@ function get_arg() {
 #   $3: description
 function flag() {
   local short long desc
-  local registered_flags="${__flags["${__handler_command}"]}"
+  local registered_flags="${__flags["${__handler_command:-_}"]}"
 
   while [ $# -gt 1 ]; do
     local value="$1"
@@ -252,7 +378,7 @@ function parse_handler() {
     __handler_command="${handler}"
     __handler_description=""
 
-    ${handler/#/@} # evaluate handler function
+    >/dev/null ${handler/#/@} # evaluate handler function
 
     # fail if a handler has no description
     [ -z "${__handler_description}" ] && echo "ERR ! No description for ${handler}!" && exit 1
@@ -270,6 +396,9 @@ function parse_handler() {
   parse_handler "${handler}"
   __parent_handler="${old_parent_handler}"
 }
+
+flag "h" "help" "shows help"; flag_help=$flag
+arg "l" "loglevel" "level" "sets the log level"
 
 parse_handler
 
