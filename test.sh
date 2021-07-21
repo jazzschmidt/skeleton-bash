@@ -103,6 +103,8 @@ Usage:
 
 HELP
 
+  __print_commands "$command"
+
   if ! $global_help; then
     __print_options "Flags" "${command}"
     __print_options "Global flags"
@@ -112,7 +114,46 @@ HELP
 }
 
 
+# Prints all commands, alphabetically sorted
+function __print_commands() {
+  local command="$1"
+  local intend=0 out name desc;
+  local parent=""
 
+  local -a cmds=()
+
+  for cmd in "${!__commands[@]}"; do
+    if [ "$cmd" = "$command" ]; then
+      continue
+    fi
+
+    if [ "${cmd:0:${#command}}" = "$command" ]; then
+      parent="${cmd:0:${#command}}"
+      cmd=${cmd#$command}
+      cmds+=( "$cmd" )
+      continue
+    fi
+
+    if [ "$command" = "_" ] && [ "$cmd" = "${cmd/ //}" ]; then
+      cmds+=( "$cmd" )
+    fi
+  done
+
+  for cmd in "${cmds[@]}"; do
+      name=$(echo "$cmd" | cut -d'#' -f1)
+      if [ ${#name} -gt "$intend" ]; then intend=${#name}; fi;
+  done
+
+  echo "Available commands:"
+  out=""
+  for cmd in "${cmds[@]}"; do
+      desc="${__commands_descriptions[${parent}${cmd}]}"
+      out+=$(printf "  %-${intend}s   %s" "$cmd" "$desc")
+      out+="\n"
+  done
+  echo -en "${out}" | sort -d
+  echo ""
+}
 
 # Prints all options (flags/args), alphabetically sorted
 function __print_options() {
