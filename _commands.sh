@@ -42,45 +42,15 @@ function __add_command() {
   __commands_description+=(["$command"]="$description")
 }
 
-function __read_command() {
-  local name="$1" cmd_name i resolved_command
-  local -a cmd_list=()
-
-  __parse_commands
-
-  # hierarchically parse commands
-  for cmd_name in $name; do
-    cmd_list+=("$cmd_name")
-    __parse_commands "${cmd_list[*]}" || echo "stop"
-  done
-
-  declare -p __commands
-}
-
 function __parse_commands() {
-  local parent="$1" commands
+  local commands
   local func command description
-  local -a new_commands=()
 
   commands=$(declare -F | grep -o '@.*')
 
-  if [ -z "$parent" ]; then # save global flags
-    __set_command_options "_"
-  fi
+  __set_command_options "_"
 
   for func in $commands; do
-    if ! array_contains "$func" "${__configured_commands[@]}"; then
-      new_commands+=("$func")
-    fi
-  done
-  echo "new commands of ${parent:-main}:"
-  declare -p new_commands
-  # clear commands when new commands are found below the parent command
-  [ "${#new_commands[@]}" -gt 0 ] && __commands=()
-  # exit early when no new commands available
-  [ "${#new_commands[@]}" -eq 0 ] && return 1
-
-  for func in "${new_commands[@]}"; do
     __current_command_name=""
     __current_command_description=""
 
@@ -89,9 +59,6 @@ function __parse_commands() {
 
     # Default command is function name without @
     command="${__current_command_name:-${func:1}}"
-
-    # Prepend parent command
-    if [ -n "$parent" ]; then command="$parent $command"; fi
 
     __add_command "$command" "$func" "$__current_command_description"
     __set_command_options "$command"

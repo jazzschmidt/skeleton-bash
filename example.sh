@@ -6,7 +6,7 @@
 #
 
 {
-  declare __argv="$*" __command
+  declare __argv="$*" __command __command_name
   declare -a __opts
   {
     # set command by removing options
@@ -17,6 +17,8 @@
     else
       read -a __opts <<< "${__argv:${#__command}}"
     fi
+    # Set top command name (remove arguments)
+    __command_name="${__command%% *}"
   }
 }
 
@@ -38,27 +40,22 @@ function @foo() {
   execute() {
     echo "Hello from froo"
   }
+}
 
-  function @foobar() {
-    command "bar"
-    echo "-- foobar"
-    flag "g" "gggg"
-    description "(-> foo bar)"
+function @foobar() {
+  command "foobar"
+  echo "-- foobar"
+  flag "g" "gggg"
+  description "(-> foo bar)"
 
-    execute() {
-      echo "Goodbye $1 - $2!"
-    }
-
-    function @bla() {
-      echo "-- bla"
-      description "(-> bla)"
-    }
+  execute() {
+    echo "Goodbye $1 - $2!"
   }
+}
 
-  function @test() {
-    echo "-- test"
-    description "(-> test)"
-  }
+function @test() {
+  echo "-- test"
+  description "(-> test)"
 }
 
 function @bar() {
@@ -72,29 +69,30 @@ function @bar() {
   }
 }
 
-echo "cmd: $__command"
+echo "cmd: $__command ($__command_name)"
 
-__read_command "$__command"
+__parse_commands
 
-#
-#__parse_commands
-#declare -p __commands
-#declare -p __commands_description
-#declare -p __commands_args
-#declare -p __commands_flags
-#
-#echo ""
-#echo ""
-#__parse_commands "foo"
-#declare -p __commands
-#declare -p __commands_description
-#declare -p __commands_args
-#declare -p __commands_flags
-#
-#echo ""
-#echo ""
-#__parse_commands "foo bar bubu"
-#declare -p __commands
-#declare -p __commands_description
-#declare -p __commands_args
-#declare -p __commands_flags
+if ! array_contains "$__command_name" "${!__commands[@]}"; then
+  # Execute main with args
+  if declare -F main >/dev/null; then
+    echo "main..."
+    main $__command_name
+  else
+    echo "HELP" && exit 1
+  fi
+fi
+
+func="${__commands[$__command_name]}"
+$func
+# set setup finished
+# -h active? -> show help
+# otherwise:
+# TRACE=y ? set -x
+# and:
+execute
+
+declare -p __commands
+declare -p __commands_description
+declare -p __commands_args
+declare -p __commands_flags
