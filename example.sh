@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+#
+# Recursive function parsing is impossible!
+# TODO: Flatten function parsing
+#
+
 {
   declare __argv="$*" __command
   declare -a __opts
