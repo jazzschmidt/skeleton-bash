@@ -22,8 +22,7 @@
   declare -a __handler_args=()
 
   # handlers
-  declare -a __handlers
-  declare -A __handlers_hashes=()
+  declare -a __handlers=()
 
   # lists of [command]: [handler-function/description]
   declare -A __commands=()
@@ -46,11 +45,31 @@
   # lists of [command]: [args/flags]
   declare -A __args=()
   declare -A __flags=()
+
+  # holds the value for current parsed arg
+  declare __current_arg
 }
 
 
 function __main() {
   local func; local -a args
+
+  flag "h" "help" "shows help"; flag_help=$flag
+
+  echo "command: $__command"
+  local -a nested_cmd=()
+
+  parse_handler
+
+  for cmd in $__command; do
+    nested_cmd+=("$cmd")
+    parse_handler "${nested_cmd[*]}"
+  done
+
+  parse_options
+
+  echo "Commands: ${__commands[*]}"
+  echo "Handlers: ${__handlers[*]}"
 
   if $flag_help; then
     __help "$__command" && exit 0
@@ -339,113 +358,67 @@ function has_flag() {
 }
 
 
-function @foo() {
-  echo "-- foo"
-  flag "s" "silent" "silences bubu"
-  flag "w" "write to file"
-  arg "n" "string" "name"
-  arg "q" "quiet" "value" "quiet bubu"
-  description "says hello"
-
-  execute() {
-    echo "Hello from froo"
-  }
-
-  function @foobar() {
-    command "foo"
-    echo "-- foo bar"
-    flag "g" "gggg"
-    description "says goodbye"
-
-    execute() {
-      echo "Goodbye $1 - $2!"
-    }
-  }
-}
-
-function @bar() {
-  echo "-- bar"
-  description "says hello parameterized"
-
-  local name="default"
-
-  execute() {
-    echo "Hello ${name}"
-  }
-}
 
 
 
 
 
-
-
-
-
-function handler_fingerprint() {
-  local handler="$1" hash
-
-  hash=$(declare -f "@${handler}" | md5)
-
-  if [ -n "${__handlers_hashes[$handler]}" ] && [ "${__handlers_hashes[$handler]}" != "${hash}" ]; then
-    echo "ERR ! Overwriting: $handler"
-    exit 1
-  fi
-
-  __handlers_hashes+=( ["${handler}"]="${hash}" )
-}
 
 function parse_handler() {
-  local command old_parent_handler
-  local new_handlers=()
+  local command="${1%% *}" next_commands="${1#* }" handler
 
-  # Set top handler
-  old_parent_handler="$__parent_handler"
-  __parent_handler="${1:-}"
+  echo "handler: ${__handlers[*]}"
 
   # Read handlers
-  mapfile -t __handlers < <( declare -F | grep '@' | cut -d'@' -f2 )
-  for handler in "${__handlers[@]}"; do
-    if [ -z "${__handlers_hashes["${handler}"]}" ]; then
-      new_handlers+=( "${handler}" )
+  local -a new_handlers=()
+  for handler in $(declare -F | grep '@' | cut -d'@' -f2); do
+    if ! array_contains "$handler" "${__handlers[@]}"; then
+      echo "appending $handler to (${new_handlers[*]})"
+      new_handlers+=("$handler")
     fi
-
-    handler_fingerprint "${handler}"
   done
 
-  if [ "${#new_handlers[*]}" -eq 0 ]; then return 0; fi
+  __handlers=("${new_handlers[@]}")
 
-  for handler in "${new_handlers[@]}"; do
+  echo "new handler: ${__handlers[*]}"
+
+  for handler in "${__handlers[@]}"; do
     __handler_command="${handler}"
     __handler_description=""
 
-    >/dev/null ${handler/#/@} # evaluate handler function
+    ${handler/#/@} # evaluate handler function
 
     # fail if a handler has no description
     [ -z "${__handler_description}" ] && echo "ERR ! No description for ${handler}!" && exit 1
-
-    if [ -n "${__commands["${__handler_command}"]}" ]; then
-      echo "ERR! Cannot overwrite ${__handler_command}"
-      exit 1
-    fi
 
     __commands+=( ["${__handler_command}"]="@${handler}" )
     __commands_descriptions+=( ["${__handler_command}"]="${__handler_description}" )
   done
 
-  # Add recursion via function
-  parse_handler "${handler}"
-  __parent_handler="${old_parent_handler}"
+  if [ -n "$command" ]; then
+    handler="${__commands[$next_commands]}"
+    echo "next: $next_commands handler: $handler"
+    $handler
+  fi
+
 }
 
-flag "h" "help" "shows help"; flag_help=$flag
-arg "l" "loglevel" "level" "sets the log level"
 
-parse_handler
+function array_contains() {
+  local e match="$1"
+  local -a args=()
+  shift
+  args=("$@")
+  echo "TEST: $match is in ${args[*]} ??"
+  for e in "${args[@]}"; do
+    [ "$e" == "$match" ] && echo "yes" && return 0
+  done
+  echo "no" && return 1
+}
 
-declare currentArg=""
 
-function validate_short() {
+
+function validate_option() {
   local option="$1" command="$2"
 
   local flags="${__flags["_"]}\n${__flags["$command"]}"
@@ -463,7 +436,7 @@ function validate_short() {
     if [ "$arg" = "-" ]; then # skip empty args
       continue
     elif [ "$arg" = "$option" ]; then # return when present
-      currentArg="$option"
+      __current_arg="$option"
       return
     fi
   done
@@ -471,36 +444,47 @@ function validate_short() {
   echo "ERR ! Unknown option: $1" && exit 1
 }
 
-declare opt_nr=0
+function parse_options() {
+  declare opt_nr=0
 
-for opt in "${__opts[@]}"; do
-  if [ -n "$currentArg" ]; then
-    if [ "${opt:0:1}" = "-" ]; then # value must not start with dash!
-      echo "ERR ! value for $currentArg must not start with '-'" && exit 1
+  for opt in "${__opts[@]}"; do
+    if [ -n "$__current_arg" ]; then
+      if [ "${opt:0:1}" = "-" ]; then # value must not start with dash!
+        echo "ERR ! value for $__current_arg must not start with '-'" && exit 1
+      fi
+
+      __current_arg="";
+      continue
     fi
 
-    currentArg="";
-    continue
+    if [ "${opt:0:2}" = "--" ]; then
+      validate_option "${opt:2}" "$__command"
+    elif [ "${opt:0:1}" = "-" ]; then # validate short options as lists
+      for (( i=1; i<${#opt}; i++ )); do
+        validate_option "${opt:$i:1}" "$__command"
+      done
+    elif echo " ${__opts[*]:$opt_nr+1}" | grep -qe " -"; then
+      echo "ERR ! Unrecognized option '${opt}'" && exit 1
+    else
+      read -a __handler_args <<< "${__opts[*]:$opt_nr}"
+      break
+    fi
+
+    (( opt_nr+=1 ))
+  done
+
+  if [ -n "$__current_arg" ]; then
+    echo "ERR ! No value provided for $__current_arg!" && exit 1
   fi
+}
 
-  if [ "${opt:0:2}" = "--" ]; then
-    validate_short "${opt:2}" "$__command"
-  elif [ "${opt:0:1}" = "-" ]; then # validate short options as lists
-    for (( i=1; i<${#opt}; i++ )); do
-      validate_short "${opt:$i:1}" "$__command"
-    done
-  elif echo " ${__opts[*]:$opt_nr+1}" | grep -qe " -"; then
-    echo "ERR ! Unrecognized option '${opt}'" && exit 1
-  else
-    read -a __handler_args <<< "${__opts[*]:$opt_nr}"
-    break
+
+# Execute _main if it was not explicitly called.
+# The trap is afterwards overwritten in the _main function
+function __init_trap() {
+  if [ $? -eq 0 ]; then
+    __main "${__args[@]}"
   fi
+}
 
-  (( opt_nr+=1 ))
-done
-
-if [ -n "$currentArg" ]; then
-  echo "ERR ! No value provided for $currentArg!" && exit 1
-fi
-
-__main "$@"
+trap __init_trap EXIT
