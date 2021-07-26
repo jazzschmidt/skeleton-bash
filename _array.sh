@@ -4,6 +4,8 @@ function array_contains() {
   local -a args=()
   shift
   args=("$@")
+  declare -p args
+  echo "-> contains $match ??"
   for e in "${args[@]}"; do
     [ "$e" == "$match" ] && return 0
   done

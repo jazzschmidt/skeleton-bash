@@ -67,24 +67,29 @@ function @bar() {
   }
 }
 
-__parse_commands
-declare -p __commands
-declare -p __commands_description
-declare -p __commands_args
-declare -p __commands_flags
+echo "cmd: $__command"
 
-echo ""
-echo ""
-__parse_commands "foo"
-declare -p __commands
-declare -p __commands_description
-declare -p __commands_args
-declare -p __commands_flags
+__read_command "$__command"
 
-echo ""
-echo ""
-__parse_commands "foo bar"
-declare -p __commands
-declare -p __commands_description
-declare -p __commands_args
-declare -p __commands_flags
+#
+#__parse_commands
+#declare -p __commands
+#declare -p __commands_description
+#declare -p __commands_args
+#declare -p __commands_flags
+#
+#echo ""
+#echo ""
+#__parse_commands "foo"
+#declare -p __commands
+#declare -p __commands_description
+#declare -p __commands_args
+#declare -p __commands_flags
+#
+#echo ""
+#echo ""
+#__parse_commands "foo bar bubu"
+#declare -p __commands
+#declare -p __commands_description
+#declare -p __commands_args
+#declare -p __commands_flags
