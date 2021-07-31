@@ -189,10 +189,10 @@ function __help() {
 
   out_usage=$(
     if $__current_command_can_execute; then
-      printf "  %s %s\n" "$usage" "${__current_command_args[*]}"
+      printf "  %s %s[flags]\n" "$usage" "${__current_command_args[*]:+${__current_command_args[*]} }"
     fi
     if [ -n "$out_commands" ]; then
-      printf "  %s [command]\n\n" "$usage"
+      printf "  %s [command] [flags]\n\n" "$usage"
       printf "Available commands:\n%s\n" "$out_commands"
     fi
   )
