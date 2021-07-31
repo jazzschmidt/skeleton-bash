@@ -9,6 +9,8 @@
   # lists of [command]: [args/flags]
   declare -a __args=()
   declare -a __flags=()
+
+  declare __current_arg
 }
 
 function flag() {
@@ -91,4 +93,71 @@ function get_arg() {
   done
 
   $success && return 0 || return 1
+}
+
+
+
+
+
+
+function __validate_option() {
+  local option="$1" command="$2"
+  echo "validating for $command"
+  local flags="${__commands_flags["$command"]}"
+  local args="${__commands_args["$command"]}"
+
+  if [ "$command" != "_" ]; then
+    flags+="\n${__commands_flags["_"]}"
+    args+="\n${__commands_args["_"]}"
+  fi
+
+  for flag in $(echo -e "${flags}" | cut -d'#' -f1-2 | tr '#' ' '); do
+    if [ "$flag" = "-" ]; then # skip empty flags
+      continue
+    elif [ "$flag" = "$option" ]; then # return when present
+      return
+    fi
+  done
+
+  for arg in $(echo -e "${args}" | cut -d'#' -f1-2 | tr '#' ' '); do
+    if [ "$arg" = "-" ]; then # skip empty args
+      continue
+    elif [ "$arg" = "$option" ]; then # return when present
+      __current_arg="$option"
+      return
+    fi
+  done
+
+  echo "ERR ! Unknown option: $1" && exit 1
+}
+
+function __parse_options() {
+  local opt_nr=0 command="$1"
+
+  for opt in "${__opts[@]}"; do
+    if [ -n "$__current_arg" ]; then
+      if [ "${opt:0:1}" = "-" ]; then # value must not start with dash!
+        echo "ERR ! value for $__current_arg must not start with '-'" && exit 1
+      fi
+
+      __current_arg="";
+      continue
+    fi
+
+    if [ "${opt:0:2}" = "--" ]; then
+      __validate_option "${opt:2}" "$command"
+    elif [ "${opt:0:1}" = "-" ]; then # validate short options as lists
+      for (( i=1; i<${#opt}; i++ )); do
+        __validate_option "${opt:$i:1}" "$command"
+      done
+    else
+      echo "ERR ! Unrecognized option '${opt}'" && exit 1
+    fi
+
+    (( opt_nr+=1 ))
+  done
+
+  if [ -n "$__current_arg" ]; then
+    echo "ERR ! No value provided for $__current_arg!" && exit 1
+  fi
 }
