@@ -102,7 +102,6 @@ function get_arg() {
 
 function __validate_option() {
   local option="$1" command="$2"
-  echo "validating for $command"
   local flags="${__commands_flags["$command"]}"
   local args="${__commands_args["$command"]}"
 

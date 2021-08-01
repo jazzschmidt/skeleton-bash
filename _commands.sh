@@ -19,6 +19,12 @@
   declare -a __current_command_args=()
 
   declare __current_command_can_execute
+
+  declare __debug=true
+  declare __trace=false
+  (echo "${DEBUG-}" | grep -qi -E "^1|true|yes|y$") && __debug=true
+  (echo "${TRACE-}" | grep -qi -E "^1|true|yes|y$") && __trace=true
+  readonly __debug __trace
 }
 
 function description() {
@@ -67,7 +73,7 @@ function __parse_commands() {
     __current_command_args=()
 
     # Execute command function to set/overwrite command name and description
-    $func
+    $func >/dev/null
 
     # Default command is function name without @
     command="${__current_command_name:-${func:1}}"
@@ -99,10 +105,13 @@ function __execute_command_function() {
       [ "$command" = "_" ] || has_args=true
     done
 
-    if [ -z "$func" ]; then func="main"; current_command="_"; fi
-
-    echo "Function: $func (${command_args[*]}) with (${options[*]})"
-    declare -p __commands_args __commands_flags
+    if [ -z "$func" ]; then
+      func="main"
+      current_command="_"
+      if [ "${command_args[*]}" = "_" ]; then
+        command_args=() # Remove _ as argument
+      fi
+    fi
 
     __parse_options "$current_command"
 
@@ -141,6 +150,9 @@ function __execute_command_function() {
     if $flag_help; then
       __help "$current_command" && exit 0
     fi
+
+    debug "Resolved command handler: $func"
+    debug "Arguments: [${command_args[*]}], options: [${options[*]}]"
 
     execute "${command_args[@]}"
 }
@@ -311,5 +323,19 @@ function __print_options() {
     done
     echo -en "${out}" | sort -db
     echo ""
+  fi
+}
+
+
+# Shows an error message
+function error() {
+  printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" >&2
+  exit 1
+}
+
+# Shows a debug message
+function debug() {
+  if $__debug; then
+    printf "[DEBUG] %s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" >&2
   fi
 }

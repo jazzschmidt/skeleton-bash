@@ -4,7 +4,7 @@ function array_contains() {
   local -a args=()
   shift
   args=("$@")
-  declare -p args
+
   for e in "${args[@]}"; do
     [ "$e" == "$match" ] && return 0
   done

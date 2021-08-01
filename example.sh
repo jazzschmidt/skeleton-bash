@@ -94,16 +94,15 @@ function @bar() {
 }
 
 main() {
+  args "PARAM"
   help() {
     echo "Hallo welt"
   }
 
   execute() {
-    echo "yo"
+    echo "yo $1"
   }
 }
-
-echo "cmd: $__command ($__command_name)"
 
 __parse_commands
 
