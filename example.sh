@@ -14,7 +14,7 @@
   declare app_description="${app_description:-"My skeleton.sh app"}"
 
   # Internal
-  declare __argv="$*" __command __command_name
+  declare __argv="$*" __command
   declare -a __opts
   {
     # set command by removing options
@@ -104,6 +104,5 @@ main() {
   }
 }
 
-__parse_commands
 
-__execute_command_function "$__command" "${__opts[*]}"
+

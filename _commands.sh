@@ -2,6 +2,8 @@
 
 {
   # Internal variables
+  declare __sourced=false
+  (return 0 2> /dev/null) && __sourced=true
 
   # [command: function/description]
   declare -A __commands=()
@@ -20,11 +22,30 @@
 
   declare __current_command_can_execute
 
-  declare __debug=true
+  declare __debug=false
   declare __trace=false
   (echo "${DEBUG-}" | grep -qi -E "^1|true|yes|y$") && __debug=true
   (echo "${TRACE-}" | grep -qi -E "^1|true|yes|y$") && __trace=true
   readonly __debug __trace
+}
+
+function __main() {
+  # set shopts when script is not sourced
+  if ! $__sourced; then
+    set -o errexit
+    set -o nounset
+    set -o pipefail
+  fi
+
+  # always set errtrace
+  set -o errtrace
+
+  if declare -f teardown>/dev/null; then
+    trap "teardown" ABRT QUIT ERR EXIT
+  fi
+
+  __parse_commands
+  __execute_command_function "$__command" "${__opts[*]}"
 }
 
 function description() {
@@ -52,7 +73,7 @@ function __add_command() {
   local command="$1" function="$2" description="$3"
 
   # fail if a command has no description
-  [ -z "$description" ] && echo "ERR ! No description for $command!" && exit 1
+  [ -z "$description" ] && error "No description for command $command!" && exit 1
 
   __commands+=(["$command"]="$function")
   __commands_description+=(["$command"]="$description")
@@ -117,7 +138,7 @@ function __execute_command_function() {
 
     # Show help
     if ! declare -F "$func" >/dev/null; then
-      [ "$command" != "_" ] && echo "ERR ! Command not found: $command"
+      [ "$command" != "_" ] && error "Command not found: $command"
       __help
       [ "$command" = "_" ] && exit 0 || exit 1
     fi
@@ -125,7 +146,8 @@ function __execute_command_function() {
     __current_command_can_execute=false
     # Default execute function
     function execute() {
-      echo "ERR ! Cannot execute $func"
+      debug "Command $func has no \`execute\` function"
+      __help "$command" && exit 1
     }
 
     # Default help function
@@ -143,8 +165,9 @@ function __execute_command_function() {
       __current_command_can_execute=true
     fi
 
+    # When args are not set, this seems to be an unknown command
     if $has_args && ! $__current_command_has_args; then
-      echo "ERR ! Command ${command} not found" && exit 1
+      error "Command not found: ${command}" && exit 1
     fi
 
     if $flag_help; then
@@ -154,7 +177,10 @@ function __execute_command_function() {
     debug "Resolved command handler: $func"
     debug "Arguments: [${command_args[*]}], options: [${options[*]}]"
 
+    # Enable tracing for custom execute functions
+    if $__trace && $__current_command_can_execute; then set -o xtrace; fi
     execute "${command_args[@]}"
+    exit $?
 }
 
 
@@ -330,7 +356,6 @@ function __print_options() {
 # Shows an error message
 function error() {
   printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" >&2
-  exit 1
 }
 
 # Shows a debug message
@@ -339,3 +364,20 @@ function debug() {
     printf "[DEBUG] %s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" >&2
   fi
 }
+
+
+
+
+
+# Execute __main if it was not explicitly called.
+function __init_trap() {
+  if declare -f teardown>/dev/null; then
+    error "Cannot use teardown function without explicit call to __main"
+  fi
+
+  if [ $? -eq 0 ]; then
+    __main "${__argv[@]}"
+  fi
+}
+
+trap __init_trap EXIT

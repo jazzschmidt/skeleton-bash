@@ -127,7 +127,7 @@ function __validate_option() {
     fi
   done
 
-  echo "ERR ! Unknown option: $1" && exit 1
+  error "Unknown option: $1" && exit 1
 }
 
 function __parse_options() {
@@ -136,7 +136,7 @@ function __parse_options() {
   for opt in "${__opts[@]}"; do
     if [ -n "$__current_arg" ]; then
       if [ "${opt:0:1}" = "-" ]; then # value must not start with dash!
-        echo "ERR ! value for $__current_arg must not start with '-'" && exit 1
+        error "Value for $__current_arg must not start with '-'" && exit 1
       fi
 
       __current_arg="";
@@ -150,13 +150,13 @@ function __parse_options() {
         __validate_option "${opt:$i:1}" "$command"
       done
     else
-      echo "ERR ! Unrecognized option '${opt}'" && exit 1
+      error "Unrecognized option '${opt}'" && exit 1
     fi
 
     (( opt_nr+=1 ))
   done
 
   if [ -n "$__current_arg" ]; then
-    echo "ERR ! No value provided for $__current_arg!" && exit 1
+    error "No value provided for $__current_arg" && exit 1
   fi
 }
