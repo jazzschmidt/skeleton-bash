@@ -1,151 +1,190 @@
 #!/usr/bin/env bash
-# ╔═══════════════════════════════════════════════╗
-# ║    === shkeleton - Bash Script Library ===    ║
-# ╚═══════════════════════════════════════════════╝
+# ╔═════════════════════════════════════════════════════╗
+# ║        ≽ skeleton.sh - Bash Script Framework        ║
+# ╚═════════════════════════════════════════════════════╝
 #
-# This script can be used to conveniently create simple-to-use bash script.
-# Either source this script or extend it to your needs and distribute it as a whole.
-#
-#
-# ╔═════════════════════╗
-# ║    --- Usage ---    ║
-# ╚═════════════════════╝
-# When used as a library, alas being sourced from your script, you need to define the
-# function `setup` in order to define options and provide startup code. Otherwise an
-# error will be raised.
-#
-# If a `teardown` function is defined, it will be called upon exiting the script.
-#
-# If a `main` function is defined, it will be executed with all options provided to
-# the script when invoking your script without a command. Without the main function, the
-# usage of your script will be displayed.
-#
-# You can define flag options via the `flag` function and argument options via `arg`.
-# Options added from your setup function will have global scope; options added from
-# command functions are bound to that command and will be displayed differently in the
-# usage.
-#
-# Commands can be added with `cmd`.
-#
-# -- EXAMPLE --
-# See 'example.sh' for a simple example.
-#
-# Thanks for using this library. Feel free to support me at https://github.com/jazzschmidt/shkeleton
+# Thanks for using this library. Feel free to support me at:
+#   https://github.com/jazzschmidt/shkeleton
 #
 
-
-
-
-# Global flags and variables
 {
+  # ┌──────────────────┐
+  # │ Global variables │
+  # └──────────────────┘
+
+  declare flag_help # Is option -h present?
+  declare flag_version # Is option --version present?
+
   # App details
-  declare -r app_name=$(basename "$0")
-  declare -r app_version=${app_version:-"0.1.0"}
-  declare -r app_description=${app_description:-"My shkeleton app"}
+  declare app_name="${app_name:-$(basename "$0")}"
+  declare app_version="${app_version:-"0.1.0"}"
+  declare app_description="${app_description:-$(
+    cat <<EOF
+≽ skeleton.sh app
 
-  # Helper variables; used to retrieve options
-  declare flag=false
-  declare arg=""
+Thanks for using skeleton.sh. You can set \$app_description to overwrite this message.
+Run with \`DEBUG=true $app_name\` to show debug messages and use \`TRACE=true\` to enable tracing of your app.
 
-  declare flag_help=false
+For further information, filing bugs or supporting this project visit:
+  https://github.com/jazzschmidt/shkeleton
+EOF
+  )}"
+
+  declare flag # determines whether a flag is present
+  declare -a arg # holds the values of an argument
+
+  # Color codes for `colorize`
+  declare -r col_red="0;31"
+  declare -r col_green="0;32"
+  declare -r col_orange="0;33"
+  declare -r col_blue="0;34"
+  declare -r col_yellow="1;33"
 }
-
-function _setup() {
-  : # Will be executed when script starts; before setup
-}
-
-function _teardown() {
-  : # Will be executed when the script finishes; after teardown
-}
-
-
-# Default command `version` shows an extended version information of your app
-# Option -s/--short emits the version number only
-function version() {
-  flag "short" "s" "short output"; short_output=$flag
-
-  if $flag_help; then
-    printf "Shows the version of %s\n\n" "${app_name}"
-    print_usage && exit 0;
-  fi
-
-  if ! $short_output; then
-    printf "%s { version %s }\n" "$app_name" "$app_version"
-  else
-    echo "$app_version"
-  fi
-}
-
-
-
-
-
-
 
 
 
 
 {
-  # Internals
+  # ┌────────────────────┐
+  # │ Internal variables │
+  # └────────────────────┘
+  declare __argv="$*" __command
+  declare -a __opts
   {
-    declare -r __args=( "$@" )
-
-    declare __sourced=false
-    (return 0 2> /dev/null) && __sourced=true
-    readonly __sourced
-
-    declare __debug=false
-    declare __trace=false
-    (echo "${DEBUG-}" | grep -qi -E "^1|true|yes|y$") && __debug=true
-    (echo "${TRACE-}" | grep -qi -E "^1|true|yes|y$") && __trace=true
-    readonly __debug __trace
-
-    declare __setupFinished=false
-    declare __commands_list=()
-    declare __flags_list=()
-    declare __args_list=()
+    # set command by removing options
+    __command="${__argv%% -*}"
+    if [ "${__command:0:1}" = "-" ]; then
+      __command="_"
+      read -a __opts <<< "${__argv}"
+    else
+      read -a __opts <<< "${__argv:${#__command}}"
+    fi
+    __command="${__command:-_}"
   }
 
-  # Colors
-  {
-    declare -r col_red="0;31"
-    declare -r col_green="0;32"
-    declare -r col_orange="0;33"
-    declare -r col_blue="0;34"
-    declare -r col_yellow="1;33"
-  }
+  declare __sourced=false
+  (return 0 2> /dev/null) && __sourced=true
+  readonly __sourced
+
+  # [command: function/description/options]
+  declare -A __commands=()
+  declare -A __commands_description=()
+  declare -A __commands_args=()
+  declare -A __commands_flags=()
+
+  # List of already configured commands
+  declare -a __configured_commands=()
+
+  # Current command description and name
+  declare __current_command_description __current_command_name
+
+  declare __current_command_has_args
+  declare -a __current_command_args=()
+
+  declare __current_command_can_execute
+
+  declare __debug=false
+  declare __trace=false
+  (echo "${DEBUG-}" | grep -qi -E "^1|true|yes|y$") && __debug=true
+  (echo "${TRACE-}" | grep -qi -E "^1|true|yes|y$") && __trace=true
+  readonly __debug __trace
+
+
+  # lists of [command]: [args/flags]
+  declare -a __args=()
+  declare -a __flags=()
+  declare __current_arg
 }
 
-# Shows an error message
-function error() {
-  printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | >&2 red
-  exit 1
-}
 
-# Shows a debug message
-function debug() {
-  if $__debug; then
-    printf "[DEBUG] %s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | orange
+
+
+
+# Main function
+function __main() {
+  # set shopts when script is not sourced
+  if ! $__sourced; then
+    set -o errexit
+    set -o nounset
+    set -o pipefail
   fi
+
+  # always set errtrace
+  set -o errtrace
+
+  if declare -f teardown>/dev/null; then
+    trap "teardown" ABRT QUIT ERR EXIT
+  fi
+
+  # Add the help flag
+  flag "h" "help" "Shows this help message"; flag_help="$flag"
+  flag "version" "Shows the version of $app_name"; flag_version="$flag"
+  readonly flag_help flag_version
+
+  if $flag_version; then
+    printf "%s %s\n" "$app_name" "$app_version" && exit 0
+  fi
+
+  __parse_commands
+  __execute_command_function "$__command" "${__opts[*]}"
 }
 
 
-# Colorizes output
-# ARGS:
-#   $1: color code (see $col_red etc.)
-#   $2: text to output (optional; otherwise text from stdin is read)
-function colorize() {
-  local color="${1-}"; local text="${2-}";
-
-  [ -z "${color}" ] && error "missing color argument"
-  [ -z "${text}" ] && IFS= read -re text # Read from stdin
-
-  color_code='\033['"$color"'m'
-  no_color='\033[0m' # No Color
-  printf "${color_code}%s${no_color}\n" "$text"
-}
 
 {
+  # ┌──────────────────────────┐
+  # │ Various helper functions │
+  # └──────────────────────────┘
+
+  # Shows an error message
+  function error() {
+    printf "%s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | red >&2
+  }
+
+  # Shows a debug message
+  function debug() {
+    if $__debug; then
+      printf "[DEBUG] %s %s: %s\n" "$app_name" "${FUNCNAME[1]}" "$*" | orange >&2
+    fi
+  }
+
+  # Usage: array_contains "ELEMENT" "ARRAY"
+  function array_contains() {
+    local e match="$1"
+    local -a args=()
+    shift
+    args=("$@")
+
+    for e in "${args[@]}"; do
+      [ "$e" == "$match" ] && return 0
+    done
+    return 1
+  }
+
+  # Colorizes output
+  # ARGS:
+  #   $1: color code (see $col_red etc.)
+  #   $2: text to output (optional; otherwise text from stdin is read)
+  function colorize() {
+    local color="${1-}"; local text="${2-}";
+
+    [ -z "${color}" ] && error "missing color argument"
+
+    color_code='\033['"$color"'m'
+    no_color='\033[0m' # No Color
+
+    printf "${color_code}"
+    if [ -z "${text}" ]; then
+      while IFS= read -ren1 -d'\n' in; do
+        #printf "%s" "$in" # Read from stdin
+        echo -en "$in"
+      done
+    else
+      printf "%s" "$text"
+    fi
+    printf "${no_color}"
+  }
+
   # Colorize functions can be called directly or via pipe:
   # Example:
   #   $ echo "Hello world" | green
@@ -171,351 +210,477 @@ function colorize() {
 
 
 
-# Prints usage information
-function print_usage() {
-  local intend; local name; local description; local cmd; local flag
 
-  if ! $__setupFinished; then
-    # Print main help
-    cat <<-HELP
-${app_description}
+{
+  # ┌───────────────────┐
+  # │ Command functions │
+  # └───────────────────┘
 
-Usage:
-${app_name} [command] [flags]
+  function description() {
+    __current_command_description="$1"
+  }
 
-HELP
+  function command() {
+    __current_command_name="$1"
+  }
 
-    __print_commands
-  fi
+  function args() {
+    __current_command_has_args=true
+    __current_command_args=("$@")
+  }
 
-  __print_options
-}
+  function __set_command_options() {
+    local command="$1"
+    __commands_args+=(["$command"]=$(printf "%s\n" "${__args[@]}"))
+    __commands_flags+=(["$command"]=$(printf "%s\n" "${__flags[@]}"))
+    __args=()
+    __flags=()
+  }
 
+  function __add_command() {
+    local command="$1" function="$2" description="$3"
 
+    # fail if a command has no description
+    [ -z "$description" ] && error "No description for command $command!" && exit 1
 
+    __commands+=(["$command"]="$function")
+    __commands_description+=(["$command"]="$description")
+  }
 
+  function __parse_commands() {
+    local commands
+    local func command description exec_hash
 
+    commands=$(declare -F | grep -o '@.*')
 
-# Registers a custom command
-# ARGS:
-#   $1: name of the command
-#   $2: function
-#   $3: command description
-function cmd() {
-  local name=$1; local func=$2; local description=$3
-  __commands_list+=("${name}#${func}#${description}")
-}
+    __set_command_options "_"
 
-# Checks if $1 is a custom command
-function __is_custom_cmd() {
-  local commands
-  printf -v commands "%s\n" "${__commands_list[@]}"
-  echo "${commands}" | cut -d'#' -f1 | grep "^$1" >/dev/null
-}
+    for func in $commands; do
+      __current_command_name=""
+      __current_command_description=""
+      __current_command_has_args=false
+      __current_command_args=()
 
+      # Execute command function to set/overwrite command name and description
+      $func >/dev/null
 
+      # Default command is function name without @
+      command="${__current_command_name:-${func:1}}"
 
+      __add_command "$command" "$func" "$__current_command_description"
+      __set_command_options "$command"
 
-# Executes the custom command $1
-function __exec_cmd() {
-  local func; local commands
-  printf -v commands "%s\n" "${__commands_list[@]}"
-  func=$(echo "${commands}" | cut -d'#' -f1-2 | grep "^$1#" | cut -d'#' -f2)
-
-  # Enable trace output if TRACE is set to true
-  if $__trace; then set -o xtrace; fi;
-
-  $func "${@:2}"
-}
-
-
-
-# Prints all commands, alphabetically sorted
-function __print_commands() {
-  local intend=0; local out;
-  local name; local desc;
-
-  for cmd in "${__commands_list[@]}"; do
-      name=$(echo "$cmd" | cut -d'#' -f1)
-      if [ ${#name} -gt "$intend" ]; then intend=${#name}; fi;
-  done
-
-  echo "Available commands:"
-  out=""
-  for cmd in "${__commands_list[@]}"; do
-      name=$(echo "$cmd" | cut -d'#' -f1)
-      desc=$(echo "$cmd" | cut -d'#' -f3)
-      out+=$(printf "  %-${intend}s   %s" "$name" "$desc")
-      out+="\n"
-  done
-  echo -en "${out}" | sort -d
-  echo ""
-}
-
-
-
-
-
-
-
-# Registers a flag and sets $flag to either true or false
-# ARGS:
-#   $1: option (short or long)
-#   $2: description
-#   -- OR --
-#   $1-$2: option (short and long)
-#   $3: description
-function flag() {
-  local short; local long; local desc; local scope;
-
-  while [ $# -gt 1 ]; do
-    local value="$1"
-    if [ "${#value}" -eq 1 ]; then
-      short="${value}"
-    else
-      long="${value}"
-    fi
-    shift
-  done
-
-  desc="$1"
-
-  $__setupFinished && scope="local" || scope="global"
-
-  __flags_list+=("${scope}#${short:--}#${long:--}#${desc}")
-
-  flag=false && has_flag "$short" "$long" || true
-}
-
-# Checks whether a flag is present
-function has_flag() {
-  local short="${1:-#}"; local long="${2:-#}";
-
-  for arg in "${__args[@]-}"; do
-    if [ "$arg" == "-$short" ] || [ "$arg" == "--$long" ]; then
-      flag=true && return 0
-    fi
-  done
-
-  return 1
-}
-
-
-
-
-
-
-
-
-# Registers an argument and sets $arg to its value, if present.
-# ARGS:
-#   $1: option (short or long)
-#   $2: parameter name
-#   $3: description
-#   -- OR --
-#   $1-$2: option (short and long)
-#   $3: parameter name
-#   $4: description
-function arg() {
-  local short; local long; local param; local desc;
-
-  if [ "$#" -ne 3 ] && [ "$#" -ne 4 ]; then
-    error "wrong number of arguments"
-  fi
-
-  args=( "$@" )
-  for i in $(seq "$#" 1); do
-    value="${args[$i-1]}"
-
-    if [ -z "$desc" ]; then
-      desc="$value"
-    elif [ -z "$param" ]; then
-      param="$value"
-    elif [ "${#value}" -eq 1 ]; then
-      short="$value"
-    else
-      long="$value"
-    fi
-  done
-
-  $__setupFinished && scope="local" || scope="global"
-
-  __args_list+=("${scope}#${short:--}#${long:--}#${param}#${desc}")
-  arg="" && get_arg "$short" "$long"
-}
-
-
-
-
-# Retrieves an argument and sets $arg to its value
-function get_arg() {
-  local short="${1:-#}"; local long="${2:-#}"; local match=false;
-
-  for arg_v in "${__args[@]}"; do
-    if $match; then
-      arg="$arg_v" && return 0
-    fi
-
-    if [ "$arg_v" == "-$short" ] || [ "$arg_v" == "--$long" ]; then
-      match=true
-    fi
-  done
-
-  return 1
-}
-
-
-
-# Prints all options (flags/args), alphabetically sorted
-function __print_options() {
-  local options_local=(); local options_global=();
-  local desc_local=(); local desc_global=();
-  local intend_local=0; local intend_global=0;
-
-  local param; local desc;
-  local scope; local short; local long;
-
-  local is_args=true
-  local arg;
-  for arg in "${__args_list[@]}" "###" "${__flags_list[@]}"; do
-    if [ "$arg" = "###" ]; then
-      is_args=false
-      continue
-    fi
-
-    scope=$(echo "$arg" | cut -d'#' -f1)
-    short=$(echo "$arg" | cut -d'#' -f2)
-    long=$(echo "$arg" | cut -d'#' -f3)
-
-    if $is_args; then
-      param=$(echo "$arg" | cut -d'#' -f4)
-      desc=$(echo "$arg" | cut -d'#' -f5-)
-    else
-      desc=$(echo "$arg" | cut -d'#' -f4-)
-    fi
-
-    # Remove dash (-)
-    short="${short%-}"; long="${long%-}"
-
-    local line=""
-
-    if [ -n "$short" ] && [ -n "$long" ]; then line="-$short, --$long"; fi;
-    if [ -n "$short" ] && [ -z "$long" ]; then line="-$short"; fi;
-    if [ -z "$short" ] && [ -n "$long" ]; then line="--$long"; fi;
-    if $is_args; then line+=" ${param}"; fi;
-
-    if [ "$scope" = "local" ]; then
-      options_local+=("$line")
-      desc_local+=("$desc")
-      if [ ${#line} -gt "$intend_local" ]; then intend_local=${#line}; fi;
-    else
-      options_global+=("$line")
-      desc_global+=("$desc")
-      if [ ${#line} -gt "$intend_global" ]; then intend_global=${#line}; fi;
-    fi
-  done
-
-  local local_out=""; local i=0
-  local option;
-
-  if [ "${#options_local[@]}" -gt 0 ]; then
-    echo "Flags:"
-    for option in "${options_local[@]}"; do
-      local_out+=$(printf "  %-${intend_local}s   %s" "$option" "${desc_local[$i]}")
-      local_out+="\n"
-      (( i+=1 ))
+      __configured_commands+=("$func")
     done
-    echo -en "${local_out}" | sort -d
-    echo ""
-  fi
+  }
 
-  local global_out=""; i=0
+  function __execute_command_function() {
+      local command="$1" options="$2" func current_command
+      local i=0 has_args=false
+      local -a argv=()
+      local -a command_args=()
 
-  if [ "${#options_global[@]}" -gt 0 ]; then
-    echo "Global flags:"
-    for option in "${options_global[@]}"; do
-      global_out+=$(printf "  %-${intend_global}s   %s" "$option" "${desc_global[$i]}")
-      global_out+="\n"
-      (( i+=1 ))
-    done
-    echo -en "${global_out}" | sort -d
-  fi
-}
+      read -a argv <<< "${command[@]}"
 
+      for i in $(seq "${#argv[@]}" 0); do
+        current_command="${argv[*]:0:i}"
+        command_args=("${argv[@]:i}")
 
+        if array_contains "$current_command" "${!__commands[@]}"; then
+          func="${__commands[$current_command]}"
+          break
+        fi
 
+        [ "$command" = "_" ] || has_args=true
+      done
 
+      if [ -z "$func" ]; then
+        func="main"
+        current_command="_"
+        if [ "${command_args[*]}" = "_" ]; then
+          command_args=() # Remove _ as argument
+        fi
+      fi
 
+      __parse_options "$current_command"
 
+      # Show help
+      if ! declare -F "$func" >/dev/null; then
+        [ "$command" != "_" ] && error "Command not found: $command"
+        __help
+        [ "$command" = "_" ] && exit 0 || exit 1
+      fi
 
-# MAIN FUNCTION
-# -------------
-function _main() {
-  # set shopts when script is not sourced
-  if ! $__sourced; then
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-  fi
+      __current_command_can_execute=false
+      # Default execute function
+      function execute() {
+        debug "Command $func has no \`execute\` function"
+        __help "$command" && exit 1
+      }
 
-  # always set errtrace
-  set -o errtrace
+      # Default help function
+      function help() {
+        echo "${__commands_description[$command]}"
+      }
 
-  # fail if no `setup` function is defined
-  if $__sourced && ! declare -F setup >/dev/null; then
-    error "no setup function defined"
-  fi
+      exec_hash=$(declare -f execute | md5)
 
-  # add the default command `version` and the help flag
-  cmd "version" "version" "shows the version of ${app_name}"
-  flag "h" "help" "shows this help message or more information about a command"; flag_help=$flag
+      # Execute command initializer once again
+      $func
 
-  # Register teardown functions
-  local teardown_cmd="_teardown"
-  if declare -F teardown >/dev/null; then
-    teardown_cmd="teardown; _teardown"
-  fi
-  trap "${teardown_cmd}" ABRT EXIT QUIT ERR
+      # Is execute newly defined?
+      if [ "$(declare -f execute | md5)" != "$exec_hash" ]; then
+        __current_command_can_execute=true
+      fi
 
-  # Local setup and internal setup
-  _setup
-  $__sourced && setup
+      # When args are not set, this seems to be an unknown command
+      if $has_args && ! $__current_command_has_args; then
+        error "Command not found: ${command}" && exit 1
+      fi
 
+      if $flag_help; then
+        __help "$current_command" && exit 0
+      fi
 
-  local command="${1:-}"
-  # Execute `main` function if defined and no command is set
-  if [ -z "$command" ] || [ "${command:0:1}" = "-" ] && ! $flag_help ; then
-    if declare -F main >/dev/null; then
-      if $__trace; then set -o xtrace; fi;
-      main "${@:1}"
+      debug "Resolved command handler: $func"
+      debug "Arguments: [${command_args[*]}], options: [${options[*]}]"
+
+      # Enable tracing for custom execute functions
+      if $__trace && $__current_command_can_execute; then set -o xtrace; fi
+      execute "${command_args[@]}"
       exit $?
+  }
+
+  function __help() {
+    local command="$1" description global_help=false usage
+    local out_commands out_flags out_flags_global
+
+    [ -z "$command" ] || [ "$command" = "_" ] && global_help=true
+
+    if $global_help; then
+      usage="${app_name}"
+      description="${app_description}"
+    else
+      usage="${app_name} ${command}"
+      description=$(help)
     fi
-  fi
 
-  if [ -z "$command" ]; then
-    command="--help"
-  fi
+    out_commands=$(__print_commands "$command")
+    out_flags=""
+    out_flags_global=""
 
-  debug "command: $command"
+    if ! $global_help; then
+      out_flags+=$(__print_options "${command}")
+      out_flags_global+=$(__print_options)
+    else
+      out_flags+=$(__print_options)
+    fi
 
-  # Execute custom commands
-  if __is_custom_cmd "$command"; then
-    __setupFinished=true
-    __exec_cmd "$command" "${@:2}"
-  elif [ "$command" == "--help" ]; then
-    print_usage
-  else
-    >&2 printf "%s: unknown command \"%s\"\n" "$app_name" "$1"
-    >&2 printf "Run '%s --help' for usage info.\n" "$app_name"
-    exit 1
-  fi
+    # Start output
+    printf "%s\n\n" "$description"
+
+    out_usage=$(
+      if $__current_command_can_execute; then
+        printf "  %s %s[flags]\n" "$usage" "${__current_command_args[*]:+${__current_command_args[*]} }"
+      fi
+      if [ -n "$out_commands" ]; then
+        printf "  %s [command] [flags]\n\n" "$usage"
+        printf "Available commands:\n%s\n" "$out_commands"
+      fi
+    )
+
+    if [ -n "$out_usage" ]; then
+      printf "Usage:\n%s\n\n" "$out_usage"
+    fi
+
+    if [ -n "$out_flags" ]; then
+      printf "Flags:\n%s\n\n" "$out_flags"
+    fi
+
+    if [ -n "$out_flags_global" ]; then
+      printf "Global flags:\n%s\n" "$out_flags_global"
+    fi
+  }
+
+
+  # Prints all commands, alphabetically sorted
+  function __print_commands() {
+    local command="$1"
+    local intend=0 out name desc;
+    local parent=""
+
+    local -a cmds=()
+
+    # Collect direct subcommands
+    for cmd in "${!__commands[@]}"; do
+      if [ "$cmd" = "$command" ]; then
+        continue
+      fi
+
+      if [ "${cmd:0:${#command}}" = "$command" ]; then
+        parent="${cmd:0:${#command}}"
+        cmd=${cmd#$command}
+
+        # Skip deeper nested commands
+        if [ "${cmd# }" != "${cmd/ /}" ]; then
+          continue;
+        fi
+
+        cmds+=( "$cmd" )
+        continue
+      fi
+    done
+
+    for cmd in "${cmds[@]}"; do
+        name=$(echo "$cmd" | cut -d'#' -f1)
+        if [ ${#name} -gt "$intend" ]; then intend=${#name}; fi;
+    done
+
+    out=""
+    for cmd in "${cmds[@]}"; do
+        desc="${__commands_description[${parent}${cmd}]}"
+        out+=$(printf "  %-${intend}s   %s" "$cmd" "$desc")
+        out+="\n"
+    done
+    echo -en "${out}" | sort -d
+    echo ""
+  }
+
+  # Prints all options (flags/args), alphabetically sorted
+  function __print_options() {
+    local command="${1:-_}"
+    local options=()
+    local descriptions=()
+    local intend=0
+
+    local param desc short long
+
+    local is_args=true
+    local arg;
+
+    local -a args=()
+    mapfile -t args < <(echo -e "${__commands_args[$command]}\n###\n${__commands_flags[$command]}")
+
+    for arg in "${args[@]}"; do
+      if [ -z "$arg" ]; then continue; fi # Skip empty lists
+
+      if [ "$arg" = "###" ]; then
+        is_args=false
+        continue
+      fi
+
+      short=$(echo "$arg" | cut -d'#' -f1)
+      long=$(echo "$arg" | cut -d'#' -f2)
+
+      if $is_args; then
+        param=$(echo "$arg" | cut -d'#' -f3)
+        desc=$(echo "$arg" | cut -d'#' -f4-)
+      else
+        desc=$(echo "$arg" | cut -d'#' -f3-)
+      fi
+
+      # Remove dash (-)
+      short="${short%-}"; long="${long%-}"
+
+      local line=""
+
+      if [ -n "$short" ] && [ -n "$long" ]; then line="-$short, --$long"; fi;
+      if [ -n "$short" ] && [ -z "$long" ]; then line="-$short"; fi;
+      if [ -z "$short" ] && [ -n "$long" ]; then line="    --$long"; fi;
+      if $is_args; then line+=" ${param}"; fi;
+
+      options+=("$line")
+      descriptions+=("$desc")
+      if [ ${#line} -gt "$intend" ]; then intend=${#line}; fi;
+    done
+
+    local out=""; local i=0
+    local option;
+
+    if [ "${#options[@]}" -gt 0 ]; then
+      for option in "${options[@]}"; do
+        out+=$(printf "  %-${intend}s   %s" "$option" "${descriptions[$i]}")
+        out+="\n"
+        (( i+=1 ))
+      done
+      echo -en "${out}" | sort -db
+      echo ""
+    fi
+  }
 }
 
-# Execute _main if it was not explicitly called.
-# The trap is afterwards overwritten in the _main function
+
+
+
+
+
+{
+  # ┌───────────────────┐
+  # │ Options functions │
+  # └───────────────────┘
+
+  function flag() {
+    local short long desc
+
+    while [ $# -gt 1 ]; do
+      local value="$1"
+      if [ "${#value}" -eq 1 ]; then
+        short="${value}"
+      else
+        long="${value}"
+      fi
+      shift
+    done
+
+    desc="$1"
+
+    __flags+=("${short:--}#${long:--}#${desc}")
+    has_flag "$short" "$long"
+  }
+
+  # Checks whether a flag is present and sets $flag
+  function has_flag() {
+    local short="${1}" long="${2}"
+
+    flag=false
+
+    if [ -n "$long" ] && echo " ${__opts[*]} " | grep -qe " --${long} "; then
+      flag=true; return 0
+    fi
+
+    if [ -n "$short" ] && echo " ${__opts[*]}" | grep -qE " -[a-zA-Z0-9]*${short}"; then
+      flag=true; return 0
+    fi
+
+    return 1
+  }
+
+  function arg() {
+    local short long param desc i value;
+    local args=( "$@" )
+
+    for i in $(seq "$#" 1); do
+      value="${args[$i-1]}"
+
+      if [ -z "$desc" ]; then
+        desc="$value"
+      elif [ -z "$param" ]; then
+        param="$value"
+      elif [ "${#value}" -eq 1 ]; then
+        short="$value"
+      else
+        long="$value"
+      fi
+    done
+
+    __args+=("${short:--}#${long:--}#${param}#${desc}")
+
+    get_arg "$short" "$long"
+  }
+
+  # Retrieves an argument and sets $arg to its values
+  function get_arg() {
+    local short="${1}" long="${2}"
+    local match=false success=false
+
+    arg=() # reset current value
+
+    for opt in "${__opts[@]}"; do
+      if $match; then
+        arg+=("$opt")
+        success=true
+        match=false
+        continue
+      fi
+
+      if [ "$opt" == "--$long" ] || echo " $opt " | grep -qE " -[a-zA-Z0-9]*${short} "; then
+        match=true
+      fi
+    done
+
+    $success && return 0 || return 1
+  }
+
+
+
+
+  function __validate_option() {
+    local option="$1" command="$2"
+    local flags="${__commands_flags["$command"]}"
+    local args="${__commands_args["$command"]}"
+
+    if [ "$command" != "_" ]; then
+      flags+="\n${__commands_flags["_"]}"
+      args+="\n${__commands_args["_"]}"
+    fi
+
+    for flag in $(echo -e "${flags}" | cut -d'#' -f1-2 | tr '#' ' '); do
+      if [ "$flag" = "-" ]; then # skip empty flags
+        continue
+      elif [ "$flag" = "$option" ]; then # return when present
+        return
+      fi
+    done
+
+    for arg in $(echo -e "${args}" | cut -d'#' -f1-2 | tr '#' ' '); do
+      if [ "$arg" = "-" ]; then # skip empty args
+        continue
+      elif [ "$arg" = "$option" ]; then # return when present
+        __current_arg="$option"
+        return
+      fi
+    done
+
+    error "Unknown option: $1" && exit 1
+  }
+
+  function __parse_options() {
+    local opt_nr=0 command="$1"
+
+    for opt in "${__opts[@]}"; do
+      if [ -n "$__current_arg" ]; then
+        if [ "${opt:0:1}" = "-" ]; then # value must not start with dash!
+          error "Value for $__current_arg must not start with '-'" && exit 1
+        fi
+
+        __current_arg="";
+        continue
+      fi
+
+      if [ "${opt:0:2}" = "--" ]; then
+        __validate_option "${opt:2}" "$command"
+      elif [ "${opt:0:1}" = "-" ]; then # validate short options as lists
+        for (( i=1; i<${#opt}; i++ )); do
+          __validate_option "${opt:$i:1}" "$command"
+        done
+      else
+        error "Unrecognized option '${opt}'" && exit 1
+      fi
+
+      (( opt_nr+=1 ))
+    done
+
+    if [ -n "$__current_arg" ]; then
+      error "No value provided for $__current_arg" && exit 1
+    fi
+  }
+}
+
+
+
+
+
+
+# Execute __main if it was not explicitly called.
 function __init_trap() {
-  if [ $? -eq 0 ]; then
-    _main "${__args[@]}"
+  local exit_code="$?"
+
+  if declare -f teardown>/dev/null; then
+    error "Cannot use teardown function without explicit call to __main"
+  fi
+
+  if [ $exit_code -eq 0 ]; then
+    __main "${__argv[@]}"
   fi
 }
 
