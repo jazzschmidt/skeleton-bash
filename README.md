@@ -1,36 +1,32 @@
-<img src="assets/logo.png" />
+<img src="assets/logo.png"  alt="skeleton:bash logo" />
 
-# shkeleton - Bash Script Library
+# skeleton:bash - Bash Script Framework
 
-**shkeleton** is a library that provides a convenient way to structure and
-organize your bash scripts and assists you in writing versatile and easy-to-use programs.
+**skeleton:bash** is a small framework that aims at providing the look-and-feel of
+any other *nix tool you and your users are used to.
+It offers a convenient way to structure and organize your bash scripts and assists
+you in writing versatile and easy-to-use programs.
+
 Whats most important: it generates usage information for you and your scripts users.
 
 ## Features
 
-**shkeleton** makes it easy to 
+**skeleton:bash** makes it easy to 
 - [parse flag and argument options](#parsing-options)
 - generate extensive usage information
-- write scripts with different commands
+- write scripts with different sub commands
 - setup and cleanup the environment
 - [debug and trace your script](#debugging-and-tracing)
 
 In addition to that, it offers functions to [colorize output and emit error messages](#helper-functions).  
 
-## Minimal Example
-Suppose this executable (chmod +x) `minimal-example.sh`:
+## Examples
+Suppose this executable (chmod +x) `example.sh`:
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 
-app_version="1.0.0"
-app_description="Example shkeleton Script"
-
-source shkeleton.sh
-
-function setup() {
-    cmd "hello" "hello_world" "Displays 'hello world'"
-}
+source skeleton.sh
 
 function hello_world() {
     arg "n" "name" "string" "Greets <name> instead of 'world'"

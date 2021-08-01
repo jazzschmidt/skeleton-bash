@@ -31,7 +31,7 @@ EOF
   )}"
 
   declare flag # determines whether a flag is present
-  declare -a arg # holds the values of an argument
+  declare -a params # holds the values of an argument
 
   # Color codes for `colorize`
   declare -r col_red="0;31"
@@ -69,7 +69,7 @@ EOF
   # [command: function/description/options]
   declare -A __commands=()
   declare -A __commands_description=()
-  declare -A __commands_args=()
+  declare -A __commands_params=()
   declare -A __commands_flags=()
 
   # List of already configured commands
@@ -90,10 +90,10 @@ EOF
   readonly __debug __trace
 
 
-  # lists of [command]: [args/flags]
-  declare -a __args=()
+  # lists of [command]: [params/flags]
+  declare -a __params=()
   declare -a __flags=()
-  declare __current_arg
+  declare __current_param
 }
 
 
@@ -112,10 +112,6 @@ function __main() {
   # always set errtrace
   set -o errtrace
 
-  if declare -f teardown>/dev/null; then
-    trap "teardown" ABRT QUIT ERR EXIT
-  fi
-
   # Add the help flag
   flag "h" "help" "Shows this help message"; flag_help="$flag"
   flag "version" "Shows the version of $app_name"; flag_version="$flag"
@@ -123,6 +119,14 @@ function __main() {
 
   if $flag_version; then
     printf "%s %s\n" "$app_name" "$app_version" && exit 0
+  fi
+
+  if declare -f teardown>/dev/null; then
+    trap "teardown" ABRT QUIT ERR EXIT
+  fi
+
+  if declare -f setup>/dev/null; then
+    setup
   fi
 
   __parse_commands
@@ -231,9 +235,9 @@ function __main() {
 
   function __set_command_options() {
     local command="$1"
-    __commands_args+=(["$command"]=$(printf "%s\n" "${__args[@]}"))
+    __commands_params+=(["$command"]=$(printf "%s\n" "${__params[@]}"))
     __commands_flags+=(["$command"]=$(printf "%s\n" "${__flags[@]}"))
-    __args=()
+    __params=()
     __flags=()
   }
 
@@ -446,7 +450,7 @@ function __main() {
     echo ""
   }
 
-  # Prints all options (flags/args), alphabetically sorted
+  # Prints all options (flags/params), alphabetically sorted
   function __print_options() {
     local command="${1:-_}"
     local options=()
@@ -455,28 +459,28 @@ function __main() {
 
     local param desc short long
 
-    local is_args=true
-    local arg;
+    local is_params=true
+    local param;
 
-    local -a args=()
-    mapfile -t args < <(echo -e "${__commands_args[$command]}\n###\n${__commands_flags[$command]}")
+    local -a opts=()
+    mapfile -t opts < <(echo -e "${__commands_params[$command]}\n###\n${__commands_flags[$command]}")
 
-    for arg in "${args[@]}"; do
-      if [ -z "$arg" ]; then continue; fi # Skip empty lists
+    for opt in "${opts[@]}"; do
+      if [ -z "$opt" ]; then continue; fi # Skip empty lists
 
-      if [ "$arg" = "###" ]; then
-        is_args=false
+      if [ "$opt" = "###" ]; then
+        is_params=false
         continue
       fi
 
-      short=$(echo "$arg" | cut -d'#' -f1)
-      long=$(echo "$arg" | cut -d'#' -f2)
+      short=$(echo "$opt" | cut -d'#' -f1)
+      long=$(echo "$opt" | cut -d'#' -f2)
 
-      if $is_args; then
-        param=$(echo "$arg" | cut -d'#' -f3)
-        desc=$(echo "$arg" | cut -d'#' -f4-)
+      if $is_params; then
+        param=$(echo "$opt" | cut -d'#' -f3)
+        desc=$(echo "$opt" | cut -d'#' -f4-)
       else
-        desc=$(echo "$arg" | cut -d'#' -f3-)
+        desc=$(echo "$opt" | cut -d'#' -f3-)
       fi
 
       # Remove dash (-)
@@ -487,7 +491,7 @@ function __main() {
       if [ -n "$short" ] && [ -n "$long" ]; then line="-$short, --$long"; fi;
       if [ -n "$short" ] && [ -z "$long" ]; then line="-$short"; fi;
       if [ -z "$short" ] && [ -n "$long" ]; then line="    --$long"; fi;
-      if $is_args; then line+=" ${param}"; fi;
+      if $is_params; then line+=" ${param}"; fi;
 
       options+=("$line")
       descriptions+=("$desc")
@@ -555,17 +559,17 @@ function __main() {
     return 1
   }
 
-  function arg() {
-    local short long param desc i value;
-    local args=( "$@" )
+  function param() {
+    local short long param_value desc i value;
+    local params=( "$@" )
 
     for i in $(seq "$#" 1); do
-      value="${args[$i-1]}"
+      value="${params[$i-1]}"
 
       if [ -z "$desc" ]; then
         desc="$value"
       elif [ -z "$param" ]; then
-        param="$value"
+        param_value="$value"
       elif [ "${#value}" -eq 1 ]; then
         short="$value"
       else
@@ -573,21 +577,21 @@ function __main() {
       fi
     done
 
-    __args+=("${short:--}#${long:--}#${param}#${desc}")
+    __params+=("${short:--}#${long:--}#${param_value}#${desc}")
 
-    get_arg "$short" "$long"
+    get_param "$short" "$long"
   }
 
   # Retrieves an argument and sets $arg to its values
-  function get_arg() {
+  function get_param() {
     local short="${1}" long="${2}"
     local match=false success=false
 
-    arg=() # reset current value
+    param=() # reset current value
 
     for opt in "${__opts[@]}"; do
       if $match; then
-        arg+=("$opt")
+        param+=("$opt")
         success=true
         match=false
         continue
@@ -607,11 +611,11 @@ function __main() {
   function __validate_option() {
     local option="$1" command="$2"
     local flags="${__commands_flags["$command"]}"
-    local args="${__commands_args["$command"]}"
+    local params="${__commands_params["$command"]}"
 
     if [ "$command" != "_" ]; then
       flags+="\n${__commands_flags["_"]}"
-      args+="\n${__commands_args["_"]}"
+      params+="\n${__commands_params["_"]}"
     fi
 
     for flag in $(echo -e "${flags}" | cut -d'#' -f1-2 | tr '#' ' '); do
@@ -622,11 +626,11 @@ function __main() {
       fi
     done
 
-    for arg in $(echo -e "${args}" | cut -d'#' -f1-2 | tr '#' ' '); do
-      if [ "$arg" = "-" ]; then # skip empty args
+    for param in $(echo -e "${params}" | cut -d'#' -f1-2 | tr '#' ' '); do
+      if [ "$param" = "-" ]; then # skip empty args
         continue
-      elif [ "$arg" = "$option" ]; then # return when present
-        __current_arg="$option"
+      elif [ "$param" = "$option" ]; then # return when present
+        __current_param="$option"
         return
       fi
     done
@@ -638,12 +642,12 @@ function __main() {
     local opt_nr=0 command="$1"
 
     for opt in "${__opts[@]}"; do
-      if [ -n "$__current_arg" ]; then
+      if [ -n "$__current_param" ]; then
         if [ "${opt:0:1}" = "-" ]; then # value must not start with dash!
-          error "Value for $__current_arg must not start with '-'" && exit 1
+          error "Value for $__current_param must not start with '-'" && exit 1
         fi
 
-        __current_arg="";
+        __current_param="";
         continue
       fi
 
@@ -660,8 +664,8 @@ function __main() {
       (( opt_nr+=1 ))
     done
 
-    if [ -n "$__current_arg" ]; then
-      error "No value provided for $__current_arg" && exit 1
+    if [ -n "$__current_param" ]; then
+      error "No value provided for $__current_param" && exit 1
     fi
   }
 }
