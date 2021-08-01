@@ -2,7 +2,7 @@
 
 # skeleton:bash - Bash Script Framework
 
-**skeleton:bash** is a small framework that aims at providing the look-and-feel of
+**skeleton:bash** is a small, declarative framework that aims at providing the look-and-feel of
 any other *nix tool you and your users are used to.
 It offers a convenient way to structure and organize your bash scripts and assists
 you in writing versatile and easy-to-use programs.
@@ -28,18 +28,13 @@ Suppose this executable (chmod +x) `example.sh`:
 
 source skeleton.sh
 
-function hello_world() {
-    arg "n" "name" "string" "Greets <name> instead of 'world'"
-    name=${arg:-world}
+function @greet() {
+  description "Displays a greeting"
+  param "name" "n" "name" "greets <name> instead of the current user"; name="$param"
 
-    if $flag_help; then
-        printf "Displays the message 'hello world'.\n\n"
-        print_usage && exit 0; # Print usage and exit
-    fi
-    
-    debug "Debug log message"
-    
-    echo "hello ${name}" | green
+  execute() {
+    echo "Hello ${name:-$(whoami)}"
+  }
 }
 ```
 

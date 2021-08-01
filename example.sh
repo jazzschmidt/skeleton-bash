@@ -2,22 +2,11 @@
 
 source skeleton.sh
 
-function main() {
-  flag "s" "silent" "silences bubu"
-  flag "w" "write to file"
-  param "n" "string" "name"
-  flag "show-version" "shows the version"
-  description "(-> foo)"
+function @greet() {
+  description "Displays a greeting"
+  param "name" "n" "name" "greets <name> instead of the current user"; name="$param"
 
   execute() {
-    echo "Hello from foo"
-  }
-
-  help() {
-    echo "Moini"
+    echo "Hello ${name:-$(whoami)}"
   }
 }
-
-
-
-

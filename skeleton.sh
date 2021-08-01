@@ -48,16 +48,17 @@ EOF
   # ┌────────────────────┐
   # │ Internal variables │
   # └────────────────────┘
-  declare __argv="$*" __command
-  declare -a __opts
+  declare __argv=("$@") __command __argv_plain="$*"
+  declare -a __opts __command_exploded
   {
     # set command by removing options
-    __command="${__argv%% -*}"
+    __command="${__argv_plain%% -*}"
     if [ "${__command:0:1}" = "-" ]; then
       __command="_"
-      read -a __opts <<< "${__argv}"
+      __opts=("${__argv[@]}")
     else
-      read -a __opts <<< "${__argv:${#__command}}"
+      read -a __command_exploded <<< "${__command[*]}"
+      __opts=("${__argv[@]:${#__command_exploded[@]}}")
     fi
     __command="${__command:-_}"
   }
@@ -568,7 +569,7 @@ function __main() {
 
       if [ -z "$desc" ]; then
         desc="$value"
-      elif [ -z "$param" ]; then
+      elif [ -z "$param_value" ]; then
         param_value="$value"
       elif [ "${#value}" -eq 1 ]; then
         short="$value"
@@ -609,16 +610,21 @@ function __main() {
 
 
   function __validate_option() {
-    local option="$1" command="$2"
+    local option="$1" command="$2" is_long="$3"
     local flags="${__commands_flags["$command"]}"
     local params="${__commands_params["$command"]}"
+    local opt_index=1 # First field -> short option
+
+    if $is_long; then
+      opt_index=2 # This is a long option
+    fi
 
     if [ "$command" != "_" ]; then
       flags+="\n${__commands_flags["_"]}"
       params+="\n${__commands_params["_"]}"
     fi
 
-    for flag in $(echo -e "${flags}" | cut -d'#' -f1-2 | tr '#' ' '); do
+    for flag in $(echo -e "${flags}" | cut -d'#' -f"$opt_index"); do
       if [ "$flag" = "-" ]; then # skip empty flags
         continue
       elif [ "$flag" = "$option" ]; then # return when present
@@ -626,7 +632,7 @@ function __main() {
       fi
     done
 
-    for param in $(echo -e "${params}" | cut -d'#' -f1-2 | tr '#' ' '); do
+    for param in $(echo -e "${params}" | cut -d'#' -f"$opt_index"); do
       if [ "$param" = "-" ]; then # skip empty args
         continue
       elif [ "$param" = "$option" ]; then # return when present
@@ -652,10 +658,10 @@ function __main() {
       fi
 
       if [ "${opt:0:2}" = "--" ]; then
-        __validate_option "${opt:2}" "$command"
+        __validate_option "${opt:2}" "$command" true
       elif [ "${opt:0:1}" = "-" ]; then # validate short options as lists
         for (( i=1; i<${#opt}; i++ )); do
-          __validate_option "${opt:$i:1}" "$command"
+          __validate_option "${opt:$i:1}" "$command" false
         done
       else
         error "Unrecognized option '${opt}'" && exit 1
