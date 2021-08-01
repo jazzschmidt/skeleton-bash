@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# ╔═════════════════════════════════════════════════════╗
-# ║        ≽ skeleton.sh - Bash Script Framework        ║
-# ╚═════════════════════════════════════════════════════╝
+# ╔═══════════════════════════════════════════════════════╗
+# ║        ≽ skeleton:bash - Bash Script Framework        ║
+# ╚═══════════════════════════════════════════════════════╝
 #
 # Thanks for using this library. Feel free to support me at:
 #   https://github.com/jazzschmidt/shkeleton
@@ -20,9 +20,9 @@
   declare app_version="${app_version:-"0.1.0"}"
   declare app_description="${app_description:-$(
     cat <<EOF
-≽ skeleton.sh app
+≽ skeleton:bash app
 
-Thanks for using skeleton.sh. You can set \$app_description to overwrite this message.
+Thanks for using skeleton:bash. You can set \$app_description to overwrite this message.
 Run with \`DEBUG=true $app_name\` to show debug messages and use \`TRACE=true\` to enable tracing of your app.
 
 For further information, filing bugs or supporting this project visit:
