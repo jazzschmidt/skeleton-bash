@@ -1,4 +1,4 @@
-<img src="assets/logo.png"  alt="skeleton:bash logo" />
+![Executing the hello command](assets/logo.png)
 
 # skeleton:bash - Bash Script Framework
 
@@ -12,10 +12,10 @@ Whats most important: it generates usage information for you and your scripts us
 ## Features
 
 **skeleton:bash** makes it easy to 
-- [parse flag and argument options](#parsing-options)
+- [parse and validate flag and parameter options](#parsing-options)
 - generate extensive usage information
-- write scripts with different sub commands
-- setup and cleanup the environment
+- [write scripts with different sub commands](#adding-commands-and-subcommands)
+- [setup and cleanup the environment](#helper-functions)
 - [debug and trace your script](#debugging-and-tracing)
 
 In addition to that, it offers functions to [colorize output and emit error messages](#helper-functions).  
@@ -38,74 +38,128 @@ function @greet() {
 }
 ```
 
-**Executing the hello command**
+**Executing the greet command**
 
-![Executing the hello command](assets/example-1.gif)
+The **greet** command will receive the parameter `name|n` and also shows them when
+running `./example.sh greet --help`.
 
-**Showing the hello help**
+![Executing the greet command](assets/example-1.gif)
 
-![Showing the hello help](assets/example-2.png)
+Also, the **greet** command is listed in the global help page:
 
-**Showing the script help**
+![Showing the script help](assets/example-2.png)
 
-![Showing the script help](assets/example-3.png)
+Instead of using named parameters, your commands can also be configured to receive
+arguments:
+
+```bash
+function @greet() {
+  description "Displays a greeting"
+  args "NAME"
+
+  execute() {
+    echo "Hello ${1}"
+  }
+
+  help() {
+    echo "Greets the given NAME"
+  }
+}
+```
+
+Since we added the `help` function, a help message other than the default description
+tells the user that he can provide the **NAME** argument.
+
+![Using options](assets/example-3.png)
+
+## Adding Commands and Subcommands
+
+Every `@function` will be added as a command to your script. The script will fail, if
+you don't provide a description. Nesting commands is a matter of renaming the command:
+
+```bash
+function @books() {
+  description "Book Management"
+}
+
+function @books-list() {
+  command "books list"
+  description "Lists books"
+
+  execute() {
+    :
+  }
+}
+
+function @books-create() {
+  command "books create"
+  description "Creates a book"
+
+  execute() {
+    :
+  }
+}
+```
+
+![Adding subcommands](assets/example-4.png)
 
 ## Parsing Options
 
-Defining options is pretty easy in **shkeleton**:
+Defining options is pretty straightforward in **skeleton:bash**:
 ```bash
-flag "s" "silent" "silences output"
-local silent=$flag # true if either -s or --silent is present, false otherwise
+function @command {
+    flag "s" "silent" "silences output"
+    declare silent=$flag # true if either -s or --silent is present, false otherwise
+    
+    flag "v" "increases verbosity"
+    declare verbose=$flag # only true, when -v is set; short and long args are interchangeable
+    
+    param "n" "name" "string" "sets the name"
+    declare name=${param:-default} # the value of -n or --name or just 'default'
+    # multiple values may be read with ${param[*]} or ${param[@]}
+    
+    param "max-age" "integer" "sets max-age"
+    local max_age=${arg:-} # the value of --max-age if present
 
-flag "v" "increases verbosity"
-local verbose=$flag # only true, when -v is set; short and long args are interchangeable
+    # ...
+}
+```
 
-arg "n" "name" "string" "sets the name"
-local name=${arg:-default} # the value of -n or --name or just 'default'
+Short options can be passed with the shorthand syntax `-abc`. If you provide an
+option, that is not declared in your command an error message will be shown:
 
-arg "max-age" "integer" "sets max-age"
-local max_age=${arg:-} # the value of --max-age if present
-````
+![Unknown options error](assets/example-5.png)
 
-The global variables `$flag` and `$arg` will hold the value directly after the
+The global variables `$flag` and `$param` will hold the value directly after the
 respective registering function has been called.
 
-Options from the `setup` functions are treated as global flags and should therefore
-be written to global variables (just like `$flag_help`), whereas options from
-command functions should be saved as local variables like shown in the example above.
-
-*Notice*: Options should be stated at the top of the command function,
-so that `print_usage` shows them. 
+Options from command functions should be saved as global variables to remain usable
+for the `execute` function like shown in the example above.
 
 ## Commands and special Functions
 
-The `cmd` command will add a named command, maps it to the given function and adds it
-to the usage page. Commands should be defined in the `setup` function.
-The `version` command is added per default.
-
-There are a few special script workflow functions:
+There are a few special functions:
 
 |Function|Description|
 |---|---|
-|`setup`|Bootstraps the script and adds commands and global flags|
-|`teardown`|(Optional) Will be called when the script exits|
-|`main`|(Optional) Will be called instead of usage page when script is being called without command |
+|`setup`|Bootstraps the script, can be used to define global options|
+|`teardown`|Will be called when the script exits|
+|`main`|Will be called instead of usage page when script is being called without command |
 
-Also, there are internal versions of these functions (`_setup`, `_teardown` and `_main`),
-that can be extended when using **shkeleton** as a library and common logic applies to all
-your programs.
+*Notice*: When using the `teardown` function, it is necessary to call `__main` at the bottom
+of your script!
 
 ### Helper Functions
 
 |Function|Description|
 |---|---|
-|`error`|Emits red error messages to stderr along with its root and exits|
+|`error`|Emits red error messages to stderr along with its origin function name|
 |`debug`|Logs an orange/brown debug message|
 |`colorize`|Colorizes output; can also be used as pipe|
 |`red`, `green`, `blue`, ...|*see above*|
-|`print_usage`|Prints usage information, should be called only after all options are set|
 |`has_flag`|Sets `$flag` to `true` when the flag option exists, false otherwise|
-|`get_arg`|Sets `$arg` to the argument options value if present|
+|`get_param`|Sets `$param` to the param values if present|
+|`array_contains`|Returns `true` if the array `$2` contains `$1`|
 
 ## Debugging and Tracing
 
@@ -117,10 +171,3 @@ are shown and colorized. They are formatted like:
 Since debugging of bash script can be pretty hard, you can also enable tracing by
 supplying the `TRACE` parameter just like the debug parameter, which will enable
 tracing as soon as the script enters your command.
-
-## TODO
-
-- parse concatenated flag arguments (`$ ./script -qts`)
-- validate unknown options
-- use associative arrays 
-- parse multiline input from stdin in `colorize`
