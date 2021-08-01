@@ -171,3 +171,16 @@ are shown and colorized. They are formatted like:
 Since debugging of bash script can be pretty hard, you can also enable tracing by
 supplying the `TRACE` parameter just like the debug parameter, which will enable
 tracing as soon as the script enters your command.
+
+```bash
+function @hello() {
+  description "Hello world"
+
+  execute() {
+    debug "Command @hello started"
+    echo "Hello world"
+  }
+}
+```
+
+![Debugging and tracing](assets/example-6.png)
