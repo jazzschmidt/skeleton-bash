@@ -1,5 +1,5 @@
 {
-  "name": "skeleton-bash-npm",
+  "name": "@jazzschmidt/skeleton-bash-npm",
   "version": "1.0.1",
   "description": "Small declarative bash script framework that aims at providing the look-and-feel of any other *nix tool you are used to",
   "scripts": {
