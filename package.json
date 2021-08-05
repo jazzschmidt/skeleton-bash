@@ -1,0 +1,26 @@
+{
+  "name": "skeleton-bash-npm",
+  "version": "1.0.1",
+  "description": "Small declarative bash script framework that aims at providing the look-and-feel of any other *nix tool you are used to",
+  "scripts": {
+    "test": "./example.sh"
+  },
+  "bin": {
+    "skeleton-bash-path": "get-path.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jazzschmidt/skeleton-bash.git"
+  },
+  "keywords": [
+    "bash",
+    "shell",
+    "script"
+  ],
+  "author": "Carsten Schmidt",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jazzschmidt/skeleton-bash/issues"
+  },
+  "homepage": "https://github.com/jazzschmidt/skeleton-bash#readme"
+}

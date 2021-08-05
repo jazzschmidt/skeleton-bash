@@ -9,9 +9,23 @@ you in writing versatile and easy-to-use programs.
 
 Whats most important: it generates usage information for you and your scripts users.
 
+## Installation
+
+For convenience you can simply install the script via npm, which adds the
+`skeleton-bash-path` command, returning the path to skeleton:bash.
+
+```bash
+#!/usr/bin/env bash
+
+command -v skeleton-bash-path &> /dev/null || npm install -g --save skeleton-bash-npm
+source "$(skeleton-bash-path)"
+
+# ...
+```
+
 ## Features
 
-**skeleton:bash** makes it easy to 
+**skeleton:bash** makes it easy to
 - [parse and validate flag and parameter options](#parsing-options)
 - generate extensive usage information
 - [write scripts with different sub commands](#adding-commands-and-subcommands)
@@ -110,14 +124,14 @@ Defining options is pretty straightforward in **skeleton:bash**:
 function @command {
     flag "s" "silent" "silences output"
     declare silent=$flag # true if either -s or --silent is present, false otherwise
-    
+
     flag "v" "increases verbosity"
     declare verbose=$flag # only true, when -v is set; short and long args are interchangeable
-    
+
     param "n" "name" "string" "sets the name"
     declare name=${param:-default} # the value of -n or --name or just 'default'
     # multiple values may be read with ${param[*]} or ${param[@]}
-    
+
     param "max-age" "integer" "sets max-age"
     local max_age=${arg:-} # the value of --max-age if present
 
